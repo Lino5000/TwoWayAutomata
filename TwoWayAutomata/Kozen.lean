@@ -4,8 +4,22 @@
 An implementation of Two-way Deterministic Finite Automata ready to follow the proof of their regularity due to Kozen.
 -/ -- TODO: add reference.
 import Mathlib.Logic.Relation
+import Mathlib.Computability.Language
+import Mathlib.Algebra.Order.Group.Nat
 
 universe u v
+
+abbrev Fin.predCast {n : Nat} (i : Fin (n + 1)) (h : i ≠ 0) : Fin (n + 1) := 
+  have prf : (i.pred h).val < n + 1 := by
+    simp
+    suffices i.val - 1 < i.val from Nat.lt_trans this i.is_lt
+    apply Nat.sub_lt_of_pos_le <| by simp
+    suffices 0 < i.val from this
+    cases hv : i.val with
+    | zero => rw [← Fin.val_ne_iff, Fin.val_zero] at h
+              contradiction
+    | succ n => exact Nat.succ_pos n
+  i.pred h |>.castLT prf
 
 inductive TapeSymbol (α : Type u) : Type u where
   | left : TapeSymbol α
@@ -73,15 +87,9 @@ section String
 structure Word (α : Type u) (n : Nat) : Type u where
   val : Vector α n
 
---def Word.get {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbol α :=
---  match i with
---  | ⟨ val, isLt ⟩ => match val with
---                     | 0 => .left
---                     | k + 1 => let kFin : Fin (n+1) := ⟨ k, Nat.lt_of_succ_lt_succ isLt ⟩
---                                if h : kFin = Fin.last n
---                                  then .right
---                                  else let ltN := Fin.val_lt_last h
---                                       w.val.get ⟨ k, ltN ⟩
+def List.toWord {α : Type u} (l : List α) : Word α (l.length) :=
+  ⟨ l.toArray.toVector ⟩
+
 def Word.get {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbol α :=
   if h : i = 0
     then .left
@@ -128,14 +136,17 @@ theorem Word.get_neq_right_of_neq_last {α : Type u} {n : Nat} {w : Word α n} {
           simp [Fin.pred, Fin.subNat, Fin.last] at h3
           simp [Fin.last, Fin.ext_iff]
           rw [Nat.sub_one] at h3
-          suffices i = n.succ by assumption
+          suffices i = n.succ by simp only [this, Nat.succ_eq_add_one, Fin.natCast_eq_last,
+            Fin.val_last, Nat.add_left_inj]
           cases h4 : i.val
-          · simp [Nat.pred, h4] at h3
-            rw [← h3]
+          · simp only [Nat.pred, h4] at h3
             have : (i : Nat) ≠ 0 := Fin.val_ne_of_ne h2
             contradiction
           · rw [h4, ← Nat.sub_one, Nat.add_sub_cancel_right] at h3
-            rw [h3]
+            rw [h3] at h4
+            rw [Fin.ext_iff]
+            simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.val_last]
+            exact h4
         have : w.get i = .right := Word.get_eq_right_of_eq_last this
         contradiction
       else simp [Word.get, h2, h3]
@@ -157,30 +168,11 @@ structure Movement.isValid {n : Nat} (move : Movement) (i : Fin (n+2)) : Prop wh
   hleft : ¬ (i = 0 ∧ move = .left)
   hright : ¬ (i = Fin.last (n+1) ∧ move = .right)
 
-theorem Fin.one_le_of_ne_zero {n : Nat} (i : Fin (n+2)) (h : i ≠ 0) : 1 ≤ i := by
-  rw [← Fin.not_lt, Fin.lt_def, Fin.val_one]
-  simp [Fin.ext_iff] at h
-  cases h : i.val
-  · contradiction
-  · simp
-
 theorem Movement.one_le_of_left_isValid {n : Nat} (i : Fin (n+2)) (h : Movement.left.isValid i) : 1 ≤ i := by
   have := h.hleft
   apply i.one_le_of_ne_zero
   simp at this
   exact this
-
-abbrev Fin.predCast {n : Nat} (i : Fin (n + 1)) (h : i ≠ 0) : Fin (n + 1) := 
-  have prf : (i.pred h).val < n + 1 := by
-    simp
-    suffices i.val - 1 < i.val from Nat.lt_trans this i.is_lt
-    apply Nat.sub_lt_of_pos_le <| by simp
-    suffices 0 < i.val from this
-    cases hv : i.val with
-    | zero => rw [← Fin.val_ne_iff, Fin.val_zero] at h
-              contradiction
-    | succ n => exact Nat.succ_pos n
-  i.pred h |>.castLT prf
 
 def Movement.apply {n : Nat} (move : Movement) (i : Fin (n+2)) (hvalid : move.isValid i) : Fin (n+2) :=
   match hm : move with
@@ -191,7 +183,7 @@ def Movement.apply {n : Nat} (move : Movement) (i : Fin (n+2)) (hvalid : move.is
   | .right => let j := i.succ
               j.castLT <| by
                 rw [Fin.val_succ i]
-                have : i < n+1 := by 
+                have : i.val < n+1 := by 
                   apply Fin.val_lt_last
                   have h := hvalid.hright
                   simp at h
@@ -216,7 +208,8 @@ theorem Movement.apply_left_ne_last {n : Nat} (i : Fin (n+2)) {valid : Movement.
 
 theorem Movement.apply_right_ne_zero {n : Nat} (i : Fin (n+2)) {valid : Movement.right.isValid i} : Movement.right.apply i valid ≠ 0 := by
   apply Fin.ne_of_gt
-  simp [Movement.apply, Fin.lt_def]
+  simp only [Movement.apply, Fin.lt_def, Fin.castLT, Fin.val_succ]
+  simp
 
 theorem Movement.isValid_opp_apply_of_isValid {n : Nat} (move : Movement) (i : Fin (n+2)) (valid : move.isValid i) :
     move.opp.isValid (move.apply i valid) := by
@@ -236,17 +229,17 @@ theorem Movement.opp_cancel_of_valid {n : Nat} (i : Fin (n+2)) (move : Movement)
   unfold Movement.apply
   unfold Movement.opp
   cases move
-  <;> simp [Fin.ext_iff]
-  -- move = .right solved by simp
-  rw [Nat.add_comm]
-  apply Nat.add_sub_cancel'
-  cases h : i.val with
-  | zero => have := valid.hleft
-            simp at this
-            rw [Fin.ext_iff, Fin.val_zero] at this
-            contradiction
-  | succ n => apply Nat.succ_le_succ
-              exact Nat.zero_le n
+  <;> simp only [Fin.ext_iff, Fin.coe_castLT, Fin.val_succ, Fin.coe_pred]
+  · rw [Nat.add_comm]
+    apply Nat.add_sub_cancel'
+    cases h : i.val with
+    | zero => have := valid.hleft
+              simp at this
+              rw [Fin.ext_iff, Fin.val_zero] at this
+              contradiction
+    | succ n => apply Nat.succ_le_succ
+                exact Nat.zero_le n
+  · apply Nat.add_one_sub_one
 
 theorem Movement.ne_zero_of_left_isValid {n : Nat} (i : Fin (n+2)) (valid : Movement.left.isValid i) : i ≠ 0 := by
   have := valid.hleft
@@ -360,6 +353,8 @@ def TwoDFA.accepts : Prop :=
 def TwoDFA.rejects : Prop :=
   ∃ i : Fin (n+2), m.reaches x ⟨ m.reject, i ⟩
             
+def TwoDFA.language (m : TwoDFA α σ) : Language α :=
+  {x : List α | m.accepts x.toWord }
 
 theorem TwoDFA.accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.manyStepConfig x ⟨ m.accept, i ⟩ ⟨ m.accept, j ⟩ := by
   have j_ne_zero : j ≠ 0 := by
@@ -406,8 +401,7 @@ theorem TwoDFA.accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.manyStepConfig
       · exact Movement.left.opp_cancel_of_valid j left_isValid_j
   termination_by j
   decreasing_by all_goals {
-    simp
-    rw [← Fin.lt_def]
+    simp only [Fin.val_fin_lt]
     exact Movement.lt_of_apply_left j
   }
 
