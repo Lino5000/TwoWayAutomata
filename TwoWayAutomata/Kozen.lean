@@ -182,12 +182,9 @@ theorem Movement.lt_of_apply_left {n : Nat} (i : Fin (n+2)) {valid : Movement.le
   apply Nat.sub_lt_of_pos_le <| by simp
   exact Movement.one_le_of_left_isValid i valid
 
-end ValidMovement
 
-variable {α : Type u} {σ : Type v} (m : TwoDFA α σ)
-
-theorem TwoDFA.step_move_always_valid {n : Nat} {x : Word α n} {i : Fin (n+2)} {move : Movement} {s t : σ} (h : m.step (x.get i) s = ⟨ t, move ⟩):
-     move.isValid i := by
+theorem TwoDFA.step_move_always_valid {α : Type u} {σ : Type v} (m : TwoDFA α σ) {n : Nat} {x : Word α n}
+     {i : Fin (n+2)} {move : Movement} {s t : σ} (h : m.step (x.get i) s = ⟨ t, move ⟩) : move.isValid i := by
   constructor
   · if hz : i = 0
       then
@@ -212,11 +209,18 @@ theorem TwoDFA.step_move_always_valid {n : Nat} {x : Word α n} {i : Fin (n+2)} 
                         simp [this]
       else simp [hl]
       
+end ValidMovement
+
+section Configurations
+
+variable {α : Type u} {σ : Type v} (m : TwoDFA α σ)
 
 @[ext]
 structure TwoDFA.Config (σ : Type v) (n : Nat) where
   state : σ
   idx : Fin (n + 2)
+
+deriving instance DecidableEq for TwoDFA.Config
 
 @[simp]
 def TwoDFA.Config.castLE {σ : Type v} {n m : Nat} (h : n ≤ m) (c : Config σ n) : Config σ m where
@@ -322,6 +326,42 @@ theorem TwoDFA.nextConfig.push_eq (c1 : Config σ n) (c2 : Config σ (n+1)) {mov
     · suffices Movement.right.apply (c1.castLE <| by simp).idx hvalid = c2.idx from this
       exact hmove
 
+end Configurations
+
+section Runs
+
+variable {α : Type u} {σ : Type v} (m : TwoDFA α σ) {n : Nat} (x : Word α n) 
+
+inductive TwoDFA.Run (start : Config σ n) : Config σ n → Type v
+  | start : Run start start
+  | step : (current next : Config σ n) → (head : Run start current) → (hstep : m.nextConfig x current next) → Run start next
+
+inductive TwoDFA.RunLeftOf (k : Fin (n+2)) (start : Config σ n) : Config σ n → Type v
+  | start : (hleft : start.idx ≤ k) → RunLeftOf k start start
+  | step : (current next : Config σ n) → (head : RunLeftOf k start current) → (hstep : m.nextConfig x current next) → (hleft : next.idx ≤ k) → RunLeftOf k start next
+
+/--
+Extract the prefix of a run which only uses configurations left of index `k`
+-/
+def TwoDFA.Run.leftOf [DecidableEq σ] {start current : Config σ n} (k : Fin (n+2)) (h : start.idx ≤ k) : m.Run x start current → Σ stop : Config σ n, m.RunLeftOf x k start stop 
+  | .start => ⟨start, TwoDFA.RunLeftOf.start h⟩
+  | .step current next head hstep => 
+    let newHead := head.leftOf k h
+    if can_continue : newHead.1 = current ∧ next.idx ≤ k
+      then 
+        have ⟨hcont, hleft⟩ := can_continue
+        ⟨next, TwoDFA.RunLeftOf.step current next (by rw [←hcont]; exact newHead.2) hstep hleft⟩
+      else newHead
+
+def TwoDFA.RunLeftOf.forget {start current : Config σ n} {k : Fin (n+2)} : m.RunLeftOf x k start current → m.Run x start current
+  | .start _ => .start
+  | .step current next head hstep _ => .step current next (head.forget) hstep
+
+end Runs
+
+
+variable {α : Type u} {σ : Type v} (m : TwoDFA α σ) {n : Nat} (x : Word α n) 
+
 /--
 After some number of steps, the machine m on input x will go from configuration start to the input configuration.
 -/
@@ -336,6 +376,9 @@ theorem TwoDFA.GoesTo.trans {start mid stop : Config σ n} (ha : m.GoesTo x star
 
 def TwoDFA.GoesTo.single {start stop : Config σ n} (hstep : m.nextConfig x start stop) : m.GoesTo x start stop :=
   .tail .refl hstep
+
+def TwoDFA.GoesTo.head {start mid stop : Config σ n} (hstep : m.nextConfig x start mid) (htail : m.GoesTo x mid stop) :
+    m.GoesTo x start stop := .trans m x (.single m x hstep) htail
 
 /--
 After some number of steps *which stay to the left of stop.idx*, the machine m on input x will go from configuration start to stop.
@@ -612,7 +655,13 @@ theorem example_ones_count {n : Nat} (w : Word (Fin 2) n) (i : Fin 2) :
     exact .refl
   | hpush a w hind =>
     rename Nat => k
-    sorry
+    cases a using Fin.cases with
+    | zero =>
+      sorry
+    | succ a =>
+      have a_eq_0 : a = 0 := Fin.fin_one_eq_zero a
+      simp [a_eq_0, Word.count_push_eq]
+      sorry
 
 theorem Fin.mod_n_of_ofNat' (n k : Nat) [neZero : NeZero n] :
     Fin.ofNat' n k = ⟨ k % n, Nat.mod_lt k neZero.pos ⟩ := by rfl
