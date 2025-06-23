@@ -43,3 +43,11 @@ def Word.get {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbo
         else
           let ltN := Fin.val_lt_last h
           w.val.get <| k.castLT ltN
+
+def Word.split_type (α : Type u) {n : Nat} (i : Fin (n+2)) (h : i ≠ 0) : Type u := 
+  (Vector α (min (i.pred h) n) × Vector α (n - (i.pred h)))
+
+--- Split the word before symbol i. Note that we can't split with i=0, since that would be trying to split before the left endmarker
+def Word.split {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_type α i h :=
+  let last := i.pred h
+  (Vector.cast (by simp [h, last]) <| w.val.take last, Vector.cast (by simp [h, last]) <| w.val.drop last)

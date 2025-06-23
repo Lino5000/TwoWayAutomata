@@ -5,24 +5,12 @@ An implementation of Two-way Deterministic Finite Automata ready to follow the p
 -/ -- TODO: add reference.
 import Mathlib.Logic.Relation
 import Mathlib.Computability.Language
+import Mathlib.Algebra.Group.Fin.Basic
 
 import TwoWayAutomata.Kozen.Basics
 import TwoWayAutomata.Kozen.Word
 
 universe u v
-
-abbrev Fin.predCast {n : Nat} (i : Fin (n + 1)) (h : i ≠ 0) : Fin (n + 1) := 
-  have prf : (i.pred h).val < n + 1 := by
-    simp
-    suffices i.val - 1 < i.val from Nat.lt_trans this i.is_lt
-    apply Nat.sub_lt_of_pos_le <| by simp
-    suffices 0 < i.val from this
-    cases hv : i.val with
-    | zero => rw [← Fin.val_ne_iff, Fin.val_zero] at h
-              contradiction
-    | succ n => exact Nat.succ_pos n
-  i.pred h |>.castLT prf
-
 
 theorem TwoDFA.accept_at_leftEnd {α : Type u} {σ : Type v} (m : TwoDFA α σ) : m.step .left m.accept = (m.accept, .right) := by
   have hinBounds := m.in_bounds_left m.accept
@@ -328,38 +316,6 @@ theorem TwoDFA.nextConfig.push_eq (c1 : Config σ n) (c2 : Config σ (n+1)) {mov
 
 end Configurations
 
-section Runs
-
-variable {α : Type u} {σ : Type v} (m : TwoDFA α σ) {n : Nat} (x : Word α n) 
-
-inductive TwoDFA.Run (start : Config σ n) : Config σ n → Type v
-  | start : Run start start
-  | step : (current next : Config σ n) → (head : Run start current) → (hstep : m.nextConfig x current next) → Run start next
-
-inductive TwoDFA.RunLeftOf (k : Fin (n+2)) (start : Config σ n) : Config σ n → Type v
-  | start : (hleft : start.idx ≤ k) → RunLeftOf k start start
-  | step : (current next : Config σ n) → (head : RunLeftOf k start current) → (hstep : m.nextConfig x current next) → (hleft : next.idx ≤ k) → RunLeftOf k start next
-
-/--
-Extract the prefix of a run which only uses configurations left of index `k`
--/
-def TwoDFA.Run.leftOf [DecidableEq σ] {start current : Config σ n} (k : Fin (n+2)) (h : start.idx ≤ k) : m.Run x start current → Σ stop : Config σ n, m.RunLeftOf x k start stop 
-  | .start => ⟨start, TwoDFA.RunLeftOf.start h⟩
-  | .step current next head hstep => 
-    let newHead := head.leftOf k h
-    if can_continue : newHead.1 = current ∧ next.idx ≤ k
-      then 
-        have ⟨hcont, hleft⟩ := can_continue
-        ⟨next, TwoDFA.RunLeftOf.step current next (by rw [←hcont]; exact newHead.2) hstep hleft⟩
-      else newHead
-
-def TwoDFA.RunLeftOf.forget {start current : Config σ n} {k : Fin (n+2)} : m.RunLeftOf x k start current → m.Run x start current
-  | .start _ => .start
-  | .step current next head hstep _ => .step current next (head.forget) hstep
-
-end Runs
-
-
 variable {α : Type u} {σ : Type v} (m : TwoDFA α σ) {n : Nat} (x : Word α n) 
 
 /--
@@ -380,40 +336,6 @@ def TwoDFA.GoesTo.single {start stop : Config σ n} (hstep : m.nextConfig x star
 def TwoDFA.GoesTo.head {start mid stop : Config σ n} (hstep : m.nextConfig x start mid) (htail : m.GoesTo x mid stop) :
     m.GoesTo x start stop := .trans m x (.single m x hstep) htail
 
-/--
-After some number of steps *which stay to the left of stop.idx*, the machine m on input x will go from configuration start to stop.
--/
-inductive TwoDFA.GoesToFromLeft (start : Config σ n) : Config σ n → Prop
-  | refl : GoesToFromLeft start start
-  | tail {mid stop : Config σ n} (head : GoesToFromLeft start mid) (tail : m.nextConfig x mid stop) (h : mid.idx < stop.idx) : GoesToFromLeft start stop
-
-def TwoDFA.GoesToFromLeft.cast {start stop : Config σ n} (h : m.GoesToFromLeft x start stop) : m.GoesTo x start stop := by
-  induction h with
-  | refl => exact .refl
-  | tail _ htail h ih => exact ih.tail htail
-
-def TwoDFA.GoesToFromLeft.trans {start mid stop : Config σ n} (ha : m.GoesToFromLeft x start mid) (hb : m.GoesToFromLeft x mid stop) : m.GoesToFromLeft x start stop := by
-  induction hb with
-  | refl => exact ha
-  | tail _ htail h ih => exact ih.tail htail h
-
-def TwoDFA.GoesToFromLeft.single {start stop : Config σ n} (hstep : m.nextConfig x start stop) (h : start.idx < stop.idx) : m.GoesToFromLeft x start stop :=
-  .tail .refl hstep h
-
-theorem TwoDFA.GoesToFromLeft.push {start stop : Config σ n} (a : α) (h : m.GoesToFromLeft x start stop) :
-    m.GoesToFromLeft (x.push a) (start.castLE <| by simp) (stop.castLE <| by simp) := by
-  induction h with
-  | refl => exact .refl
-  | tail _ htail h ih =>
-    rename Config σ n => stop2
-    apply ih.tail
-    · apply TwoDFA.nextConfig.push_lt m x a htail 
-      apply Fin.lt_of_lt_of_le
-      · exact h
-      · exact stop2.idx.le_last
-    · simp only [Config.castLE, Fin.castLE_lt_castLE_iff]
-      exact h
-
 
 def TwoDFA.reaches (c : Config σ n) : Prop :=
   m.GoesTo x ⟨ m.start, 0 ⟩ c
@@ -426,6 +348,7 @@ def TwoDFA.rejects : Prop :=
             
 def TwoDFA.language (m : TwoDFA α σ) : Language α :=
   {x : List α | m.accepts x.toWord }
+
 
 theorem TwoDFA.accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.accept, i ⟩ ⟨ m.accept, j ⟩ := by
   have j_ne_zero : j ≠ 0 := by
@@ -591,111 +514,197 @@ def example2DFA : TwoDFA (Fin 2) ExampleState where
              apply Exists.intro Movement.right <;>
                rfl
 
-def Word.count {α : Type u} [BEq α] {n : Nat} (w : Word α n) (x : α) : Nat := w.val.count x
+theorem exampleZerosPass_ofCount {n : Nat} (hn : n ≠ 0) (i : Fin (n+2)) (h : i ≠ 0) (w : Word (Fin 2) n) (j : Fin 3) (hcount : (w.split i h).fst.count 0 % 3 = j) :
+    example2DFA.GoesTo w ⟨example2DFA.start, 0⟩ ⟨.q j, i.castLE <| by simp⟩ := by
+  let pi := i.pred h
+  let piCast : Fin (n+2) := pi.castLE <| by simp
+  cases ha : w.get piCast with
+  | left =>
+    simp only [Fin.castLE, Word.get_eq_left_iff_eq_0, Fin.mk_eq_zero] at ha
+    have : pi.succ = 1 := by
+      conv at ha =>
+        unfold piCast
+        rw [←Fin.val_inj]
+        simp only [Fin.coe_castLE, Fin.val_zero, Fin.val_eq_zero_iff]
+      simp [ha]
+    simp only [Fin.castLE, this, Fin.val_one']
+    have hi : i = 1 := by simp [pi] at this; assumption
+    simp only [hi, Fin.val_one, Fin.mk_one]
+    have hj : j = 0 := by
+      simp [w.split_one i hi] at hcount
+      symm; rwa [←Fin.val_inj, Fin.val_zero]
+    rw [hj]
+    conv in example2DFA.start => simp [example2DFA]
+    apply TwoDFA.GoesTo.single
+    have hvalid : Movement.right.isValid (0 : Fin (n+2)) := by constructor <;> simp
+    right -- TwoDFA.nextConfig x y = ⟨step x = (y, .right)⟩
+    · simp only [example2DFA, Fin.isValue, pi, Word.get_eq_left_of_eq_zero rfl, exampleStep]
+    · suffices Movement.right.apply 0 hvalid = 1 by assumption
+      simp [Movement.apply, ←Fin.val_inj]
+  | right =>
+    simp only [← Word.get_eq_right_iff_eq_last, ← Fin.val_eq_val, Fin.coe_castLE,
+      Fin.val_last, piCast] at ha
+    have := pi.is_lt
+    rw [ha, lt_self_iff_false] at this
+    contradiction
+  | symbol a =>
+    have piInternal : piCast.internal := w.internal_of_get_eq_symbol <| by use a
+    have piCast_ne_zero : piCast ≠ 0 := by simp [piInternal.left]
+    have := w.split_pred i <| by
+      rw [←Fin.val_fin_lt, Fin.val_one]
+      have := Nat.succ_lt_of_lt_pred <| by
+        have := Fin.pos_of_ne_zero piCast_ne_zero
+        simp only [←Fin.val_fin_lt, Fin.val_zero, Fin.coe_castLE, Fin.coe_pred, piCast, pi] at this
+        exact this
+      simpa
+    simp [this, Vector.count_push] at hcount
+    have piCast_eq_predCast : i.predCast h = piCast := rfl
+    have : w.getInternal (i.predCast h) piInternal = a := by
+      simp [this, Word.getInternal, Fin.internal.val]
+      have pi_ne_zero : pi ≠ 0 := by
+        unfold piCast at piCast_ne_zero
+        rw [←Fin.val_ne_iff] at piCast_ne_zero
+        simpa using piCast_ne_zero
+      have piCast_pred_lt_n : piCast.pred piCast_ne_zero < n := by
+        suffices (pi : Nat) - 1 < n by simp only [Fin.coe_pred, Fin.coe_castLE, piCast, this]
+        apply Nat.sub_one_lt_of_le
+        · apply Nat.pos_of_ne_zero
+          rwa [←Fin.val_ne_iff] at pi_ne_zero
+        · exact pi.is_le
+      have : (piCast.pred piCast_ne_zero).castLT piCast_pred_lt_n = pi.pred pi_ne_zero := by
+        rw [←Fin.val_eq_val]
+        simp [piCast]
+      rw [this]
+      have piCast_pred_ne_last : piCast.pred piCast_ne_zero ≠ Fin.last n := by 
+        suffices piCast.pred piCast_ne_zero < pi from Fin.ne_last_of_lt this
+        rw [←Fin.val_fin_lt]
+        suffices (pi : Nat) - 1 < pi by simpa [piCast]
+        apply Nat.pred_lt_self
+        simp only [Nat.sub_eq, tsub_zero, Fin.val_pos_iff]
+        exact Fin.pos_of_ne_zero pi_ne_zero
+      have : pi.pred pi_ne_zero = (piCast.pred piCast_ne_zero).castPred piCast_pred_ne_last := by
+        rw [←Fin.val_inj]
+        simp [piCast]
+      rw [this]
+      simpa [Word.get, piCast_ne_zero, piCast_pred_ne_last] using ha
+    rw [this] at hcount
+    have : w.split (i.predCast h) (by rwa [piCast_eq_predCast]) = w.split piCast piCast_ne_zero := by simp [Word.split, piCast, pi]
+    rw [this] at hcount
+    let countFin : Fin 3 := Fin.ofNat 3 <| (w.split piCast piCast_ne_zero).1.count 0
+    have hcountFin : (w.split piCast piCast_ne_zero).1.count 0 % 3 = countFin.val := rfl
+    have move_right_valid_from_piCast : Movement.right.isValid piCast := by
+      constructor
+      · simp
+      · simp [piInternal.right]
+    have move_right_from_piCast : Movement.right.apply piCast move_right_valid_from_piCast = i := by
+      simp only [Movement.apply]
+      rw [←Fin.val_inj]
+      simp [piCast, pi, Nat.sub_one_add_one <| Fin.val_ne_of_ne h]
+    if hazero : a = 0
+      then
+        have prev_count : (w.split piCast piCast_ne_zero).1.count 0 % 3 = ↑(j - 1) := by
+          simp [hazero] at hcount 
+          rw [hcountFin, Fin.val_eq_val]
+          suffices countFin + 1 = j by rw [←this]; simp
+          unfold countFin
+          rw [Fin.ofNat_add, ←Fin.val_eq_val]
+          simp [hcount]
+        let prev : TwoDFA.Config ExampleState n := ⟨ .q (j-1), piCast ⟩
+        have hind : example2DFA.GoesTo w ⟨example2DFA.start, 0⟩ prev := exampleZerosPass_ofCount hn piCast piCast_ne_zero w (j-1) prev_count
+        constructor
+        · exact hind
+        · rw [←TwoDFA.stepConfig_gives_nextConfig]
+          simp only [TwoDFA.stepConfig, example2DFA, Fin.isValue, Fin.castLE_refl,
+            TwoDFA.Config.mk.injEq, prev]
+          rw [hazero] at ha
+          constructor
+          · simp [ha, exampleStep]
+          · simp [ha, exampleStep, move_right_from_piCast]
+      else
+        have prev_count : (w.split piCast piCast_ne_zero).1.count 0 % 3 = ↑j := by
+          simpa [hazero] using hcount
+        let prev : TwoDFA.Config ExampleState n := ⟨ .q j, piCast ⟩
+        have hind : example2DFA.GoesTo w ⟨example2DFA.start, 0⟩ prev := exampleZerosPass_ofCount hn piCast piCast_ne_zero w j prev_count
+        constructor
+        · exact hind
+        · rw [←TwoDFA.stepConfig_gives_nextConfig]
+          simp only [TwoDFA.stepConfig, example2DFA, Fin.isValue, Fin.castLE_refl,
+            TwoDFA.Config.mk.injEq, prev]
+          have : a = 1 := by
+            apply Or.elim <| fin2_lt_2 a
+            · intro; contradiction
+            · intro; trivial
+          rw [this] at ha
+          constructor
+          · simp [ha, exampleStep]
+          · simp [ha, exampleStep, move_right_from_piCast]
+  termination_by sizeOf i
+  decreasing_by all_goals {
+    suffices (i : Nat) - 1 < i by simp [this]
+    have : i.val ≠ 0 := Fin.val_ne_of_ne h
+    exact Nat.sub_one_lt this
+  }
 
-theorem word_count_eq_list_count {α : Type u} [BEq α] (w : List α) (x : α) : w.toWord.count x = w.count x := by
-  simp [Word.count, List.toWord]
 
-theorem Word.count_nil {α : Type u} [BEq α] (x : α) : Word.nil.count x = 0 := by
-  simp only [count, nil, Vector.count_mk, List.count_toArray, List.count_nil]
+/- #check (x.split i).fst.count 0 % 3 = 0 -/
+theorem exampleZerosPass {n : Nat} (i : Fin (n+2)) (h : i ≠ 0) (w : Word (Fin 2) n) (j : Fin 3) :
+    (w.split i h).fst.count 0 % 3 = j ↔ example2DFA.GoesTo w ⟨example2DFA.start, 0⟩ ⟨.q j, i.castLE <| by simp⟩ := by
+  if hn : n = 0
+    then
+      have : i = 1 := by
+        have := i.is_le
+        conv at this =>
+          simp only [hn, zero_add]
+          rw [Nat.le_iff_lt_or_eq]
+        rw [←Fin.val_inj, Fin.val_one]
+        apply Or.resolve_left this
+        simpa
+      have split_empty := w.split_one i this
+      simp [split_empty, this]
+      have w_get_zero := w.get_eq_left_of_eq_zero (i := 0) <| by trivial
+      constructor
+      · intro hj
+        have hj := Eq.symm hj
+        rw [Fin.val_eq_zero_iff] at hj
+        rw [hj]
+        apply TwoDFA.GoesTo.single
+        rw [←TwoDFA.stepConfig_gives_nextConfig]
+        simp only [TwoDFA.stepConfig, example2DFA, TwoDFA.Config.mk.injEq, w_get_zero, exampleStep]
+        constructor
+        · trivial
+        · simp only [Movement.apply]
+          rw [←Fin.val_inj]
+          simp
+      · intro hgoes
+        by_contra hj
+        apply Or.elim <| fin3_lt_3 j
+        · intro h2
+          rw [←Fin.val_inj, Fin.val_zero] at h2
+          have := h2.symm
+          contradiction
+        · intro hj
+          apply Or.elim hj
+          · intro hj
+            rw [hj] at hgoes
+            sorry
+          · intro hj
+            rw [hj] at hgoes
+            sorry
+    else
+      constructor
+      · exact exampleZerosPass_ofCount hn i h w j
+      · intro h
+        sorry
 
-theorem Word.count_push_eq {α : Type u} [BEq α] [ReflBEq α] {n : Nat} (w : Word α n) (x : α) : (w.push x).count x = (w.count x) + 1 := by
-  simp only [count, push, Vector.count_push, BEq.refl, ite_true]
-
-theorem Word.count_push_ne {α : Type u} [BEq α] [LawfulBEq α] {n : Nat} (w : Word α n) (x y : α) (h : x ≠ y) : (w.push y).count x = w.count x := by
-  simp only [count, push]
-  exact Vector.count_push_of_ne h.symm
-
-theorem example_zeros_count {n : Nat} (w : Word (Fin 2) n) (i : Fin 3) :
-    example2DFA.GoesToFromLeft w ⟨ .q i, 0 ⟩ ⟨ .q (i + w.count 0), Fin.last (n + 1) ⟩ := by
-  induction w using Word.inductionPush with
-  | hnil =>
-    rw [Word.count_nil]
-    have : i + ↑(0 : Nat) = i := by
-      simp only [Nat.cast, Fin.isValue, Fin.natCast_eq_zero, Nat.dvd_zero]
-      exact Fin.add_zero i
-    simp only [Fin.isValue, Nat.reduceAdd, Fin.reduceLast, this]
-    clear this
-    apply TwoDFA.GoesToFromLeft.single example2DFA Word.nil
-    · suffices example2DFA.step (Word.nil.get 0) (.q i) = (.q i, .right) by
-        right
-        · exact this
-        · simp [Movement.apply]
-        · exact example2DFA.step_move_always_valid this
-      have : Word.nil.get 0 = .left (α := Fin 2) := Word.get_eq_left_of_eq_zero <| .refl 0
-      simp only [example2DFA, Fin.isValue, exampleStep, this]
-    · simp
-  | hpush a w hind =>
-    rename Nat => k  -- Implicit argument renamed separately
-    apply TwoDFA.GoesToFromLeft.tail
-    · have := TwoDFA.GoesToFromLeft.push example2DFA w a hind
-      simp at this
-      exact this
-    · let c1 : TwoDFA.Config ExampleState k := ⟨ .q (i + w.count 0), Fin.last (k+1) ⟩
-      let c2 : TwoDFA.Config ExampleState (k+1) := ⟨ .q (i + (w.push a).count 0), Fin.last (k+2) ⟩
-      have heq : c1.idx = Fin.last (k+1) := .refl c1.idx
-      have hstep : example2DFA.step a c1.state = ⟨c2.state, .right⟩ := by
-        cases a using Fin.cases with
-        | zero => simp [example2DFA, exampleStep, c1, c2, Word.count_push_eq, Fin.ext_iff, Fin.val_add, add_assoc]
-        | succ i' => simp [Fin.fin_one_eq_zero i', example2DFA, exampleStep, c1, c2, Word.count_push_ne]
-      have hmove : Movement.right.apply (c1.idx.castLE <| by simp) (Movement.right.isValid_castLE_of_lt_of_ne_0 c1.idx (by simp) (by simp [heq])) = c2.idx := by
-        simp [c1, c2, Movement.apply, Fin.castLE, Fin.last]
-      exact TwoDFA.nextConfig.push_eq example2DFA w c1 c2 a heq hstep hmove
-    · simp [Fin.lt_def]
-
-theorem example_ones_count {n : Nat} (w : Word (Fin 2) n) (i : Fin 2) :
-    example2DFA.GoesTo w ⟨ .p i, n ⟩ ⟨ .p (i + w.count 1), 0 ⟩ := by
-  induction w using Word.inductionPush with
-  | hnil =>
-    rw [Word.count_nil]
-    have : i + ↑(0 : Nat) = i := by
-      simp only [Nat.cast, Fin.isValue, Fin.natCast_eq_zero, Nat.dvd_zero]
-      exact Fin.add_zero i
-    simp only [Nat.reduceAdd, this, Fin.isValue]
-    exact .refl
-  | hpush a w hind =>
-    rename Nat => k
-    cases a using Fin.cases with
-    | zero =>
-      sorry
-    | succ a =>
-      have a_eq_0 : a = 0 := Fin.fin_one_eq_zero a
-      simp [a_eq_0, Word.count_push_eq]
-      sorry
-
-theorem Fin.mod_n_of_ofNat' (n k : Nat) [neZero : NeZero n] :
-    Fin.ofNat' n k = ⟨ k % n, Nat.mod_lt k neZero.pos ⟩ := by rfl
-
-theorem example_on_triple_zeros {w : List (Fin 2)} (h : tripleZeros w) :
-    example2DFA.GoesToFromLeft w.toWord ⟨ .q 0, 0 ⟩ ⟨ .q 0, Fin.last (w.length + 1) ⟩ := by
-  have h2 := example_zeros_count w.toWord 0
-  have : (w.toWord.count 0 : Fin 3) = ⟨ (w.toWord.count 0) % 3, _ ⟩ := Fin.mod_n_of_ofNat' 3 <| w.toWord.count 0
-  rw [this] at h2; clear this
-  have : w.toWord.count 0 = w.count 0 := word_count_eq_list_count w 0
-  rw [this] at h2; clear this
-  conv at h2 =>
-    pattern List.count 0 w % 3
-    rw [h]
-  exact h2
-
-theorem example_on_even_ones {w : List (Fin 2)} (h : evenOnes w) :
-    example2DFA.GoesTo w.toWord ⟨ .p 0, w.length ⟩ ⟨ .p 0, 0 ⟩ := by
-  have h2 := example_ones_count w.toWord 0
-  have : (w.toWord.count 1 : Fin 2) = ⟨ (w.toWord.count 1) % 2, _ ⟩ := Fin.mod_n_of_ofNat' 2 <| w.toWord.count 1
-  rw [this] at h2; clear this
-  have : w.toWord.count 1 = w.count 1 := word_count_eq_list_count w 1
-  rw [this] at h2; clear this
-  conv at h2 =>
-    pattern List.count 1 w % 2
-    rw [h]
-  exact h2
+theorem list_count_eq_vector_count {α : Type u} [BEq α] (w : List α) (a : α) : List.count a w = Vector.count a w.toWord.val := by
+  simp only [List.toWord, Vector.count, List.count_toArray]
 
 theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
-  ext
-  rename List (Fin 2) => w
   unfold exampleLanguage
   unfold TwoDFA.language
-  rw [Set.mem_def, Set.mem_def, Set.setOf_app_iff, Set.setOf_app_iff]
+  rw [Set.setOf_inj]
+  ext
+  rename List (Fin 2) => w
   constructor
 
   -- example2DFA.accepts w → w ∈ exampleLanguage
@@ -705,36 +714,12 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
   -- w ∈ exampleLanguage → example2DFA.accepts w
   · intro h
     have ⟨ hzeros, hones ⟩ := h
+    conv at hzeros =>
+      unfold tripleZeros
+      rw [list_count_eq_vector_count]
 
-    have zeros_pass := example_on_triple_zeros hzeros |>.cast
-
-    have turn_around : example2DFA.GoesTo w.toWord ⟨ .q 0, Fin.last (w.length + 1) ⟩ ⟨ .p 0, w.length ⟩ := by
-      apply TwoDFA.GoesTo.single example2DFA w.toWord
-      have hvalid : Movement.left.isValid <| Fin.last (w.length + 1) := by constructor <;> simp
-      left
-      · have := w.toWord.get_eq_right_of_eq_last (i := Fin.last (w.length + 1)) <| by rfl
-        simp [this, example2DFA, exampleStep]
-      · suffices Movement.left.apply (Fin.last (w.length + 1)) hvalid = w.length from this
-        simp [Movement.apply, Fin.predCast, Fin.pred_last, Fin.ext_iff]
-        symm
-        apply Nat.mod_eq_of_lt
-        apply Nat.lt_add_right 1
-        simp
-
-    have ones_pass := example_on_even_ones hones
-
-    have accept_at_left : example2DFA.nextConfig w.toWord ⟨ .p 0, 0 ⟩ ⟨ .t, 1 ⟩ := by
-      have hvalid : Movement.right.isValid (0 : Fin (w.length + 2)) := by constructor <;> simp
-      right
-      · have := w.toWord.get_eq_left_of_eq_zero <| by rfl
-        simp [this, example2DFA, exampleStep]
-      · suffices Movement.right.apply 0 hvalid = 1 from this
-        simp [Movement.apply, Fin.castLT]
-
-    apply Exists.intro 1
-    apply TwoDFA.GoesTo.trans example2DFA w.toWord zeros_pass
-    apply TwoDFA.GoesTo.trans example2DFA w.toWord turn_around
-    apply TwoDFA.GoesTo.trans example2DFA w.toWord ones_pass
-    exact TwoDFA.GoesTo.single example2DFA w.toWord accept_at_left
+    let n := w.length
+    have zerosPass := exampleZerosPass_ofCount sorry (Fin.last (n+1)) sorry (w.toWord) 0 sorry
+    sorry
 
 end example2DFA
