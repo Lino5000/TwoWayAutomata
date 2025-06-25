@@ -30,6 +30,8 @@ structure TwoDFA (α : Type u) (σ : Type v) : Type (max u v) where
 structure Word (α : Type u) (n : Nat) : Type u where
   val : Vector α n
 
+def Word.empty {α : Type u} : Word α 0 := ⟨#[].toVector⟩
+
 def List.toWord {α : Type u} (l : List α) : Word α (l.length) :=
   ⟨ l.toArray.toVector ⟩
 

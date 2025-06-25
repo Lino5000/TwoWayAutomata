@@ -267,8 +267,12 @@ abbrev split_spec {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i
   let ⟨ l, r ⟩ := w.split i h
   Vector.cast (split_lens_add_to_n n i h) (l ++ r) = w.val
 
-theorem Word.split_append {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_spec w i h := by
+theorem Word.split_meets_spec {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_spec w i h := by
   simp [split_spec, split, h, Vector.cast]
+
+theorem Word.split_append {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) :
+    (w.split i h).1 ++ (w.split i h).2 = Vector.cast (split_lens_add_to_n n i h).symm w.val := by
+  simp [Word.split, Vector.cast]
 
 theorem Word.split_one {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (hi : i = 1) :
     w.split i (by simp [hi]) = ((⟨#[], by simp [hi]⟩, Vector.cast (by simp [hi]) w.val) : split_type α i (by simp [hi])) := by
@@ -321,6 +325,26 @@ theorem Word.split_pred {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) 
   unfold Vector.cast
   simp [split, getInternal_eq_getElem, Fin.internal.val, l1]
 
+theorem split_pred2_lens {n : Nat} (i : Fin (n+2)) (hi : 1 < i) : n - ↑((i.predCast <| Fin.ne_zero_of_lt hi).pred <| Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi)) - 1 = n - ↑(i.pred <| Fin.ne_zero_of_lt hi) := by
+  suffices n - (↑i - 1 - 1) - 1 = n - (↑i - 1) by simpa
+  suffices (i : Nat) - 1 ≠ 0 by rw [Nat.sub_sub, Nat.sub_one_add_one this]
+  apply Nat.ne_of_gt
+  rw [←Nat.succ_lt_succ_iff]
+  have : (i : Nat) ≠ 0 := Nat.ne_zero_of_lt hi
+  conv =>
+    rhs
+    rw [←Nat.add_one, Nat.sub_one_add_one this]
+  exact hi
+
+theorem Word.split_pred2 {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (hi : 1 < i) :
+    Vector.cast (split_pred2_lens i hi).symm (w.split i <| Fin.ne_zero_of_lt hi).2 = (w.split (i.predCast <| Fin.ne_zero_of_lt hi) <| Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi)).2.tail := by
+  have : (i : Nat) - 1 - 1 + 1 = (i : Nat) - 1 := by
+    apply Nat.sub_one_add_one
+    rw [Fin.lt_iff_val_lt_val, Fin.val_one] at hi
+    have : (i : Nat) ≠ 0 := Nat.ne_zero_of_lt hi
+    exact Nat.ne_of_gt <| Nat.zero_lt_sub_of_lt hi
+  simp [Word.split, Vector.cast, this]
+
 theorem Fin.succCast_ne_zero {n : Nat} (i : Fin (n+1)) (hilast : i ≠ Fin.last n) : i.succCast hilast ≠ 0 := by
   simp [←Fin.val_ne_iff]
 
@@ -335,8 +359,17 @@ theorem split_succ_idx_eq {n : Nat} (i : Fin (n+2)) (hi : i ≠ 0) (hilast : i �
   simp [l1, l2, Nat.sub_one_add_one l3]
 
 theorem Word.split_succ {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (hi : i ≠ 0) (hilast : i ≠ Fin.last (n+1)) :
-    (w.split i hi).1.push (w.getInternal i ⟨hi, hilast⟩) = Vector.cast (split_succ_idx_eq i hi hilast) (w.split (i.succCast hilast) (i.succCast_ne_zero hilast)).1 := by
+    Vector.cast (split_succ_idx_eq i hi hilast).symm ((w.split i hi).1.push (w.getInternal i ⟨hi, hilast⟩)) = (w.split (i.succCast hilast) (i.succCast_ne_zero hilast)).1 := by
   have l1 : (i : Nat) - 1 + 1 = i := Nat.sub_one_add_one <| by rwa [←Fin.val_ne_iff] at hi
   unfold Vector.cast
   simp [split, getInternal_eq_getElem, Fin.internal.val, l1]
 
+theorem split_2_idx_valid_of_internal {n : Nat} {i : Fin (n+2)} (h : i.internal) : 0 < n - ↑(i.pred h.left) := by
+  simp only [Fin.coe_pred, Nat.sub_pos_iff_lt]
+  rw [←Nat.add_one_lt_add_one_iff, Nat.sub_one_add_one <| by simp [h.left]]
+  have := Fin.lt_last_iff_ne_last.mpr h.right
+  simpa
+
+theorem Word.split_2_getElem {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (int : i.internal) :
+    (w.split i int.left).2[0]'(split_2_idx_valid_of_internal int) = w.getInternal i int := by
+  simp [Word.split, Word.getInternal, Fin.internal.val, Vector.get]
