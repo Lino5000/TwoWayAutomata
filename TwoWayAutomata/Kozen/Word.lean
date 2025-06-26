@@ -182,6 +182,7 @@ def Word.inductionPush {α : Type u} {motive : ∀ {n : Nat}, Word α n → Sort
 
 
 
+@[reducible]
 def Fin.internal {n : Nat} (i : Fin (n+2)) : Prop :=
   i ≠ 0 ∧ i ≠ Fin.last (n+1)
 
@@ -199,8 +200,25 @@ def Fin.internal.val {n : Nat} {i : Fin (n+2)} (h : i.internal) : Fin n :=
     exact this
   p.castLT hp
 
+@[simp]
 theorem Fin.internal.val_eq_pred {n : Nat} {i : Fin (n+2)} (int : i.internal) : int.val = i.val - 1 := by
   simp only [val, coe_castLT, coe_pred]
+
+@[simp]
+theorem Fin.internal.i_val_ne_last {n : Nat} {i : Fin (n+2)} (int : i.internal) : i.val ≠ n+1 := by
+  have := int.right
+  simpa [Fin.ne_iff_vne] using this
+
+@[simp]
+theorem Fin.internal.i_val_ne_zero {n : Nat} {i : Fin (n+2)} (int : i.internal) : i.val ≠ 0 := by
+  simp [int.left]
+
+@[simp]
+theorem Fin.internal.pred_ne_last {n : Nat} {i : Fin (n+2)} (int : i.internal) : i.pred int.left ≠ Fin.last n := by
+  simp only [ne_iff_vne, coe_pred, val_last]
+  rw [←Nat.add_one_ne_add_one_iff, Nat.sub_one_add_one]
+  · exact int.i_val_ne_last
+  · exact int.i_val_ne_zero
 
 def Word.get_eq_symbol_of_internal {α : Type u} {n : Nat} (w : Word α n) {i : Fin (n+2)} (int : i.internal) :
     w.get i = .symbol (w.val.get int.val) := by
@@ -283,6 +301,14 @@ theorem Word.split_one {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (
   · simp [←Vector.toArray_inj, hi]
   · simp [Vector.cast_eq_cast, ←Vector.toArray_inj, Vector.toArray_extract, Vector.toArray_cast, hi]
 
+theorem Word.split_last {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (hi : i = Fin.last _) :
+    w.split i (by simp [hi]) = ((Vector.cast (by simp [hi]) w.val, ⟨#[], by simp [hi]⟩) : split_type α i (by simp [hi])) := by
+  simp only [split, Fin.coe_pred, Vector.take_eq_extract, Vector.cast_rfl, Vector.drop_eq_cast_extract]
+  rw [Prod.mk_inj]
+  constructor
+  · simp [←Vector.toArray_inj, hi]
+  · simp [←Vector.toArray_inj, Vector.toArray_extract, Vector.toArray_cast, hi]
+
 abbrev Fin.predCast {n : Nat} (i : Fin (n+1)) (h : i ≠ 0) : Fin (n+1) := (i.pred h).castLE <| by simp
 
 abbrev Fin.succCast {n : Nat} (i : Fin (n+1)) (h : i ≠ Fin.last n) : Fin (n+1) := i.succ.castLT <| by
@@ -363,6 +389,22 @@ theorem Word.split_succ {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) 
   have l1 : (i : Nat) - 1 + 1 = i := Nat.sub_one_add_one <| by rwa [←Fin.val_ne_iff] at hi
   unfold Vector.cast
   simp [split, getInternal_eq_getElem, Fin.internal.val, l1]
+
+theorem split_succ2_lens {n : Nat} {i : Fin (n + 2)} (hi : i ≠ 0) (hilast : i ≠ Fin.last _) :
+    n - ↑(i.pred hi) - 1 = n - ↑((i.succCast hilast).pred <| Fin.succCast_ne_zero i hilast) := by
+  have : i.val ≠ 0 := by rwa [Fin.ne_iff_vne, Fin.val_zero] at hi
+  simp [Nat.sub_sub, Nat.sub_one_add_one this]
+
+theorem Word.split_succ2 {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (hi : i ≠ 0) (hilast : i ≠ Fin.last (n+1)) :
+    Vector.cast (split_succ2_lens hi hilast) (w.split i hi).2.tail = (w.split (i.succCast hilast) <| Fin.succCast_ne_zero i hilast).2 := by
+  have l1 : i.val - 1 + 1 = i := Nat.sub_one_add_one <| by rwa [←Fin.val_ne_iff] at hi
+  have l2 : i.val - 1 + (n - (i.val - 1)) = n := by
+    rw [←Nat.add_sub_assoc]
+    apply Nat.add_sub_self_left
+    rw [←Nat.add_one_le_add_one_iff, l1]
+    exact i.is_le
+  unfold Vector.cast
+  simp [split, getInternal_eq_getElem, Fin.internal.val, l1, l2]
 
 theorem split_2_idx_valid_of_internal {n : Nat} {i : Fin (n+2)} (h : i.internal) : 0 < n - ↑(i.pred h.left) := by
   simp only [Fin.coe_pred, Nat.sub_pos_iff_lt]
