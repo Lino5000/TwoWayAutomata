@@ -351,7 +351,7 @@ theorem Word.split_pred {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) 
   unfold Vector.cast
   simp [split, getInternal_eq_getElem, Fin.internal.val, l1]
 
-theorem split_pred2_lens {n : Nat} (i : Fin (n+2)) (hi : 1 < i) : n - ↑((i.predCast <| Fin.ne_zero_of_lt hi).pred <| Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi)) - 1 = n - ↑(i.pred <| Fin.ne_zero_of_lt hi) := by
+lemma split_pred2_lens {n : Nat} (i : Fin (n+2)) (hi : 1 < i) : n - ↑((i.predCast <| Fin.ne_zero_of_lt hi).pred <| Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi)) - 1 = n - ↑(i.pred <| Fin.ne_zero_of_lt hi) := by
   suffices n - (↑i - 1 - 1) - 1 = n - (↑i - 1) by simpa
   suffices (i : Nat) - 1 ≠ 0 by rw [Nat.sub_sub, Nat.sub_one_add_one this]
   apply Nat.ne_of_gt
@@ -370,6 +370,22 @@ theorem Word.split_pred2 {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2))
     have : (i : Nat) ≠ 0 := Nat.ne_zero_of_lt hi
     exact Nat.ne_of_gt <| Nat.zero_lt_sub_of_lt hi
   simp [Word.split, Vector.cast, this]
+
+lemma split_pred2_lens' {n : Nat} (i j : Fin (n+2)) (hi : 1 < i) (hj : j = i.predCast (Fin.ne_zero_of_lt hi)) :
+    n - ↑(j.pred <| by rw [hj]; exact Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi)) - 1 = n - ↑(i.pred <| Fin.ne_zero_of_lt hi) := by
+  conv in j => rw [hj]
+  exact split_pred2_lens i hi
+
+theorem Word.split_pred2' {n : Nat} {α : Type u} (w : Word α n) (i j : Fin (n+2)) (hi : 1 < i) (hj : j = i.predCast (Fin.ne_zero_of_lt hi)) :
+    Vector.cast (split_pred2_lens' i j hi hj).symm (w.split i <| Fin.ne_zero_of_lt hi).2 =
+      (w.split j <| by rw [hj]; exact Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi)).2.tail := by
+  have jval : j.val = i.val - 1 := by simp [hj]
+  have : (i : Nat) - 1 - 1 + 1 = (i : Nat) - 1 := by
+    apply Nat.sub_one_add_one
+    rw [Fin.lt_iff_val_lt_val, Fin.val_one] at hi
+    have : (i : Nat) ≠ 0 := Nat.ne_zero_of_lt hi
+    exact Nat.ne_of_gt <| Nat.zero_lt_sub_of_lt hi
+  simp [Word.split, Vector.cast, jval, this]
 
 theorem Fin.succCast_ne_zero {n : Nat} (i : Fin (n+1)) (hilast : i ≠ Fin.last n) : i.succCast hilast ≠ 0 := by
   simp [←Fin.val_ne_iff]

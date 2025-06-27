@@ -1,6 +1,33 @@
 import TwoWayAutomata.Kozen
 
+
 section example2DFA
+
+universe u
+theorem Vector.count_tail {α : Type u} [BEq α] (n : Nat) (w : Vector α (n+1)) (a : α) : Vector.count a w = Vector.count a w.tail + if w[0] == a then 1 else 0 := by
+  have eq_push_front : w = w.tail.insertIdx 0 w[0] := by
+    suffices #[w[0]] = w.toArray.extract 0 1 by simp [insertIdx, this, Array.extract_eq_self_of_le]
+    rw [Array.extract_succ_right (by simp) (by simp)]
+    simp
+  conv =>
+    lhs
+    rw [eq_push_front]
+    simp only [Nat.add_one_sub_one, insertIdx_zero, count_cast, count_append, count_mk, List.count_toArray, List.count_singleton]
+    rw [Nat.add_comm]
+
+theorem Vector.tail_cast {α : Type u} {n m : Nat} (w : Vector α n) (h : n = m) : (Vector.cast h w).tail = Vector.cast (by simp [h]) w.tail := by
+  simp [extract, h]
+
+theorem list_count_eq_vector_count {α : Type u} [BEq α] (w : List α) (a : α) : List.count a w = Vector.count a w.toWord.val := by
+  simp only [List.toWord, Vector.count, List.count_toArray]
+
+theorem dite_eq_of_same_branch {α : Sort _} (c : Prop) [h : Decidable c] (b : α) : dite c (fun _ ↦ b) (fun _ ↦ b) = b := by
+  if x : c then simp else simp
+
+theorem Nat.mod_2_add_move {x y : Nat} (h : (x + 1) % 2 = y) : x % 2 = (1 + y) % 2 := by
+  have : 1 % 2 = 1 := by simp
+  rw [←h, ←this, Nat.mod_succ, Nat.add_mod_mod, Nat.add_comm, Nat.add_assoc]
+  simp
 
 def tripleZeros (x : List (Fin 2)) : Prop := (x.count 0) % 3 = 0
 def evenOnes (x : List (Fin 2)) : Prop := (x.count 1) % 2 = 0
@@ -201,20 +228,52 @@ theorem exampleZerosPass_ofCount {n : Nat} (hn : n ≠ 0) (i : Fin (n+2)) (h : i
     exact Nat.sub_one_lt this
   }
 
-theorem exampleOnesPass_ofCount {n : Nat} (hn : n ≠ 0) (i : Fin (n+2)) (h : i ≠ Fin.last _) (w : Word (Fin 2) n) (j : Fin 2) (hcount : (w.split (i.succCast h) (i.succCast_ne_zero h)).snd.count 1 % 2 = j) :
+theorem exampleOnesPass_ofCount {n : Nat} (hn : n ≠ 0) (i : Fin (n+2)) (h : i ≠ Fin.last _) (w : Word (Fin 2) n) (j : Fin 2)
+  (hcount : (w.split (i.succCast h) (i.succCast_ne_zero h)).snd.count 1 % 2 = j) :
     example2DFA.GoesTo w ⟨.q 0, Fin.last _⟩ ⟨.p j, i⟩ := by
   cases hget : w.get i with
   | left =>
     have i_eq_zero := w.eq_zero_of_get_eq_left hget
     have i_succ_eq_one : i.succCast h = 1 := by simp [i_eq_zero, Fin.succCast, Fin.castLT]
     conv at hcount =>
-      simp [w.split_one _ i_succ_eq_one]
+      simp only [w.split_one _ i_succ_eq_one, Vector.count_cast]
     rw [i_eq_zero]
     let prev : TwoDFA.Config ExampleState n := ⟨.p j, 1⟩
-    have prev_count : Vector.count 1 (w.split (Fin.succCast 0 (by simp)) <| Fin.succCast_ne_zero 0 (by simp)).2 % 2 = j.val := by
-      have : Fin.succCast 0 (by simp) = (1 : Fin (n+2)) := by simp [Fin.succCast, Fin.castLT]
-      simp [w.split_one _ this, hcount]
-    exact exampleOnesPass_ofCount hn 0 (by simp) w j prev_count
+    have last_ne_one : 1 ≠ Fin.last (n+1) := by
+      rw [Fin.ne_iff_vne]
+      simpa
+    have prev_int : prev.idx.internal := ⟨by simp [prev], by simp [prev, last_ne_one]⟩
+    simp only [prev] at prev_int
+    have hget_prev := w.get_eq_symbol_of_internal prev_int
+    simp only [Fin.internal.val, Fin.pred_one, Fin.castLT, Fin.val_zero] at hget_prev
+    rcases fin2_lt_2 <| w.val.get ⟨0, Nat.pos_of_ne_zero hn⟩ with ha | ha
+    case' inl => -- w.get 1 = 0
+      let prev_j := j
+    case' inr => -- w.get 1 = 1
+      let prev_j := j - 1
+    all_goals
+      have prev_count : Vector.count 1 (w.split (Fin.succCast 1 last_ne_one) <| Fin.succCast_ne_zero 1 last_ne_one).2 % 2 = prev_j.val := by
+        rw [←w.split_succ2 1 (by simp) last_ne_one, Vector.count_cast]
+        simp only [w.split_one 1 rfl, Vector.tail_cast, Vector.count_cast]
+        simp [Vector.get] at ha
+        rcases n with zero | n'
+        · contradiction -- uses (hn : n ≠ 0), refines n := n'.succ so that Vector.count_tail works
+        conv at hcount =>
+          rw [w.val.count_tail, ha]
+          simp
+        -- Only in the w.get 1 = 1 case do we need this extra step, it fails in the other case
+        try have hcount := Nat.mod_2_add_move hcount
+        unfold prev_j
+        simpa [Fin.sub_def] using hcount
+      have prev_step : example2DFA.nextConfig w ⟨.p prev_j, 1⟩ ⟨.p j, 0⟩ := by
+        rw [ha] at hget_prev
+        rw [←TwoDFA.stepConfig_gives_nextConfig]
+        simp [example2DFA, TwoDFA.stepConfig, hget_prev, prev_j, exampleStep]
+        simp [Movement.apply, Fin.predCast, Fin.castLT]
+      have _term : Fin.last (n + 1) - 1 < Fin.last (n + 1) - i := by
+        simp [i_eq_zero, Fin.sub_one_lt_iff, Fin.last_pos]
+      have prev_reached := exampleOnesPass_ofCount hn 1 last_ne_one w prev_j prev_count
+      exact .tail prev_reached prev_step
   | right =>
     have := w.eq_last_of_get_eq_right hget
     contradiction
@@ -229,28 +288,113 @@ theorem exampleOnesPass_ofCount {n : Nat} (hn : n ≠ 0) (i : Fin (n+2)) (h : i 
       let get_sym := a
     case' neg => -- prev_idx ≠ .last _
       obtain ⟨a', get_prev⟩ : ∃ x, w.get prev_idx = .symbol x := by
-        sorry
+        rw [←w.get_eq_symbol_iff_internal]
+        exact ⟨Fin.succCast_ne_zero _ i_int.right, hprev⟩
       let get_sym := a'
     all_goals
       rcases fin2_lt_2 get_sym with ha | ha
       focus -- a = 0
-        let prev : TwoDFA.Config ExampleState n := ⟨.p j, prev_idx⟩
+        let prev_j := j
       rotate_left; focus -- a = 1
-        let prev : TwoDFA.Config ExampleState n := ⟨.p (j-1), prev_idx⟩
-      all_goals
-        unfold get_sym at ha
-        let hind : example2DFA.GoesTo w ⟨.q 0, Fin.last _⟩ prev := sorry
-        constructor
-        · exact hind
-        · simp only [example2DFA, ← TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, TwoDFA.Config.mk.injEq]
-          simp [prev, get_prev, ha]
-          simp only [exampleStep, Fin.zero_eq_one_iff]
-          sorry
+        let prev_j := j - 1
+    -- Move back out to individual cases because we need to treat the first step of the pass differently
+    case pos.inl | pos.inr => -- prev_idx = .last _
+      let prev : TwoDFA.Config ExampleState n := ⟨.q 0, prev_idx⟩
+      -- i = .last _ - 1 from prev_idx = .last _
+      have i_lastpred : i = (Fin.last _).predCast (by simp) := by
+        simp [←Fin.val_inj]
+        simp [←Fin.val_inj] at hprev
+        have : i.val + 1 = prev_idx.val := by simp [prev_idx]
+        rw [←Nat.add_one_inj]
+        trans
+        · exact this
+        · exact hprev
+      -- Must have j = 0; can get it from the count
+      have hj : j = 0 := by
+        rw [←Fin.val_inj, Fin.val_zero, ←hcount]
+        have prev_gt_one : 1 < prev_idx := by
+          rw [hprev]
+          have : NeZero n := ⟨hn⟩
+          exact Fin.one_lt_last
+        have := w.split_pred2' prev_idx i prev_gt_one <| by simp [prev_idx, Fin.succCast, Fin.predCast, Fin.castLT]
+        rw [←this, Vector.count_cast]
+        simp [w.split_last _ hprev]
+      -- Now it should simplify out
+      rw [hj, i_lastpred]
+      apply TwoDFA.GoesTo.single
+      simp only [example2DFA, ← TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, TwoDFA.Config.mk.injEq]
+      rw [hprev] at get_prev
+      simp only [exampleStep, get_prev, true_and]
+      simp [Movement.apply]
+    case neg.inl | neg.inr => -- prev_idx ≠ .last _
+      unfold get_sym at ha
+      have prev_count : Vector.count 1 (w.split (prev_idx.succCast hprev) <| Fin.succCast_ne_zero _ hprev).2 % 2 = ↑prev_j := by
+        unfold prev_idx
+        rw [
+          ←w.split_succ2 _ (Fin.succCast_ne_zero _ i_int.right) hprev,
+          ←w.split_succ2 _ i_int.left i_int.right,
+          Vector.count_cast, Vector.tail_cast, Vector.count_cast,
+        ]
+        let n' := n.pred
+        have hn' : n'.succ = n := by simp [n', Nat.sub_one_add_one hn]
+        have : n - ↑(i.pred i_int.left) - 1 = (n' - ↑(i.pred i_int.left) - 1) + 1 := by
+          repeat rw [Nat.sub_sub]
+          have : ↑(i.pred i_int.left) + 1 ≤ n' := by
+            suffices i.val ≤ n' by simpa [Nat.sub_one_add_one <| Fin.val_ne_of_ne i_int.left]
+            have := Fin.lt_last_iff_ne_last.mpr hprev
+            rw [←Nat.succ_le_succ_iff]
+            conv at this =>
+              rw [Fin.lt_iff_val_lt_val]
+              simp [prev_idx]
+            rw [hn']
+            exact this
+          conv =>
+            rhs
+            rw [Nat.add_comm, ←Nat.add_sub_assoc this]
+            lhs
+            rw [Nat.add_comm, Nat.add_one, hn']
+        let tail1 : Vector (Fin 2) ((n' - ↑(i.pred i_int.left) - 1) + 1) := Vector.cast this (w.split i i_int.left).2.tail
+        have := Vector.count_tail _ tail1 1
+        conv at this =>
+          unfold tail1
+          rw [Vector.count_cast]
+        rw [this, Vector.tail_cast, Vector.count_cast] at hcount
+        have : tail1[0] = a' := by
+          have prev_ne_0 : prev_idx ≠ 0 := Fin.succCast_ne_zero _ i_int.right
+          have prev_pred_eq_i : prev_idx.predCast prev_ne_0 = i := by
+            simp [prev_idx, Fin.predCast, Fin.succCast, Fin.castLT]
+          have prev_pred_ne_last : prev_idx.pred prev_ne_0 ≠ Fin.last _ := by
+            rwa [←Fin.pred_last, ne_eq, Fin.pred_inj]
+          have : prev_idx.val - 1 = i.val - 1 + 1 := by
+            simp [←Fin.val_inj] at prev_pred_eq_i
+            simpa [Nat.sub_one_add_one <| Fin.val_ne_of_ne i_int.left]
+          simpa [tail1, Word.get, Vector.get, prev_ne_0, prev_pred_ne_last, Word.split, this] using get_prev
+        unfold tail1 at this
+        conv at hcount =>
+          rw [this, ha, Nat.add_mod]
+          pattern _ + _; rhs
+          simp
+        -- Only in the a = 1 case do we need this extra step, it fails in the other case
+        try have hcount := Nat.mod_2_add_move hcount
+        simpa using hcount
+      have _term : Fin.last _ - (i.succCast h) < Fin.last _ - i := by
+        rw [Fin.lt_iff_val_lt_val, Fin.sub_val_of_le prev_idx.is_le, Fin.sub_val_of_le i.is_le]
+        simp only [Fin.val_last, Fin.coe_castLT, Fin.val_succ, Nat.reduceSubDiff, prev_idx]
+        rw [←Nat.add_lt_add_iff_right (k := i.val)]
+        have i_le_n : i.val ≤ n := by
+          have := Fin.lt_last_iff_ne_last.mpr h
+          rw [Fin.lt_iff_val_lt_val, ←Nat.lt_eq, Nat.lt] at this
+          simpa
+        rw [Nat.sub_add_cancel i_le_n, Nat.sub_add_cancel i_le_n.step]
+        simp
+      let hind := exampleOnesPass_ofCount hn prev_idx hprev w prev_j prev_count
+      apply TwoDFA.GoesTo.tail hind
+      simp only [example2DFA, ← TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, TwoDFA.Config.mk.injEq]
+      simp only [get_prev, ha, prev_idx, prev_j]
+      simp only [exampleStep, TapeSymbol.symbol.injEq, Fin.zero_eq_one_iff,
+        Nat.succ_ne_self, imp_self, true_and]
+      simp [Movement.apply, Fin.succCast, Fin.predCast, Fin.castLT]
   termination_by sizeOf (Fin.last _ - i)
-  decreasing_by all_goals {
-    simp
-    sorry
-  }
 
 theorem exampleZerosPass {n : Nat} (w : Word (Fin 2) n) (j : Fin 3) (hcount : w.val.count 0 % 3 = j) :
     example2DFA.GoesTo w ⟨example2DFA.start, 0⟩ ⟨.q j, Fin.last _⟩ := by
@@ -271,21 +415,6 @@ theorem exampleZerosPass {n : Nat} (w : Word (Fin 2) n) (j : Fin 3) (hcount : w.
       apply exampleZerosPass_ofCount hn (i := Fin.last _) (h := by simp)
       simp [Word.split, hcount]
 
-universe u
-theorem Vector.count_tail {α : Type u} [BEq α] (n : Nat) (w : Vector α (n+1)) (a : α) : Vector.count a w = Vector.count a w.tail + if w[0] == a then 1 else 0 := by
-  have eq_push_front : w = w.tail.insertIdx 0 w[0] := by
-    suffices #[w[0]] = w.toArray.extract 0 1 by simp [insertIdx, this, Array.extract_eq_self_of_le]
-    rw [Array.extract_succ_right (by simp) (by simp)]
-    simp
-  conv =>
-    lhs
-    rw [eq_push_front]
-    simp only [Nat.add_one_sub_one, insertIdx_zero, count_cast, count_append, count_mk, List.count_toArray, List.count_singleton]
-    rw [Nat.add_comm]
-
-theorem Vector.tail_cast {α : Type u} {n m : Nat} (w : Vector α n) (h : n = m) : (Vector.cast h w).tail = Vector.cast (by simp [h]) w.tail := by
-  simp [extract, h]
-
 theorem exampleOnesPass {n : Nat} (w : Word (Fin 2) n) (j : Fin 2) (hcount : w.val.count 1 % 2 = j) :
     example2DFA.GoesTo w ⟨.q 0, Fin.last _⟩ ⟨.p j, 0⟩ := by
   if hn : n = 0
@@ -305,9 +434,6 @@ theorem exampleOnesPass {n : Nat} (w : Word (Fin 2) n) (j : Fin 2) (hcount : w.v
       apply exampleOnesPass_ofCount hn (i := 0) (h := by simp) (j := j)
       simp [Word.split, hcount]
 
-theorem list_count_eq_vector_count {α : Type u} [BEq α] (w : List α) (a : α) : List.count a w = Vector.count a w.toWord.val := by
-  simp only [List.toWord, Vector.count, List.count_toArray]
-
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
   atLeft
     | .p j, word => (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = ↑j
@@ -316,15 +442,13 @@ def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState
     | .r  , word => (word.count 0) % 3 ≠ 0 ∨ (word.count 1) % 2 = 1
   inWord
     | .q j, _, _ => fun ⟨wleft, _⟩ ↦ wleft.count 0 % 3 = ↑j
-    | .p j, idx, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ wright.tail.count 1 % 2 = ↑j
+    | .p j, _, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ wright.tail.count 1 % 2 = ↑j
     | .t  , _, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0
     | .r  , _, _ => fun ⟨wleft, wright⟩ ↦ ¬((wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0)
 
 theorem exampleCMBase {n : Nat} (w : Word (Fin 2) n) : exampleConfigMeaning.apply w ⟨example2DFA.start, 0⟩ := by
   simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, example2DFA]
 
-theorem dite_eq_of_same_branch {α : Sort _} (c : Prop) [h : Decidable c] (b : α) : dite c (fun _ ↦ b) (fun _ ↦ b) = b := by
-  if x : c then simp else simp
 
 theorem exampleCMInd {n : Nat} (w : Word (Fin 2) n) (cfg : TwoDFA.Config ExampleState n) (hind : exampleConfigMeaning.apply w cfg) :
     exampleConfigMeaning.apply w (example2DFA.stepConfig w cfg) := by
