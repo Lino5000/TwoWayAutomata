@@ -1,22 +1,18 @@
-universe u v
+import Mathlib.Data.Fintype.Fin
 
-inductive TapeSymbol (α : Type u) : Type u where
+inductive TapeSymbol (α : Type _) : Type _ where
   | left : TapeSymbol α
   | right : TapeSymbol α
   | symbol : α → TapeSymbol α
 
-instance {α : Type u} : Coe α (TapeSymbol α) where
+instance {α : Type _} : Coe α (TapeSymbol α) where
   coe := TapeSymbol.symbol
 
 inductive Movement : Type where
   | left : Movement
   | right : Movement
 
-def Movement.opp : Movement → Movement
-  | .left => .right
-  | .right => .left
-
-structure TwoDFA (α : Type u) (σ : Type v) : Type (max u v) where
+structure TwoDFA (α σ : Type*) : Type _ where
   step : TapeSymbol α → σ → σ × Movement
   start : σ
   accept : σ
@@ -27,15 +23,65 @@ structure TwoDFA (α : Type u) (σ : Type v) : Type (max u v) where
   halt_move_right : ∀ a : α, step a accept = (accept, Movement.right) ∧ step a reject = (reject, Movement.right)
   halt_preserve_state : ∀ a : TapeSymbol α, (∃ m : Movement, step a accept = (accept, m)) ∧ (∃ m : Movement, step a reject = (reject, m))
 
-structure Word (α : Type u) (n : Nat) : Type u where
+theorem TwoDFA.accept_at_leftEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .left m.accept = (m.accept, .right) := by
+  have hinBounds := m.in_bounds_left m.accept
+  have hpreserve := m.halt_preserve_state .left
+  cases hinBounds with
+  | intro wBounds hBounds => cases hpreserve.left with
+                             | intro wPres hPres => rw [hBounds, Prod.ext_iff] at hPres
+                                                    simp only at hPres
+                                                    rw [hPres.left] at hBounds
+                                                    exact hBounds
+
+theorem TwoDFA.accept_not_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) {a : TapeSymbol α} (h : a ≠ .right) : m.step a m.accept = (m.accept, .right) := by
+  cases a with
+  | left => exact m.accept_at_leftEnd
+  | right => contradiction
+  | symbol a => exact m.halt_move_right a |>.left
+
+theorem TwoDFA.reject_at_leftEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .left m.reject = (m.reject, .right) := by
+  have hinBounds := m.in_bounds_left m.reject
+  have hpreserve := m.halt_preserve_state .left
+  cases hinBounds with
+  | intro wBounds hBounds => cases hpreserve.right with
+                             | intro wPres hPres => rw [hBounds, Prod.ext_iff] at hPres
+                                                    simp only at hPres
+                                                    rw [hPres.left] at hBounds
+                                                    exact hBounds
+
+theorem TwoDFA.reject_not_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) {a : TapeSymbol α} (h : a ≠ .right) : m.step a m.reject = (m.reject, .right) := by
+  cases a with
+  | left => exact m.reject_at_leftEnd
+  | right => contradiction
+  | symbol a => exact m.halt_move_right a |>.right
+
+@[ext]
+structure TwoDFA.Config (σ : Type _) (n : Nat) where
+  state : σ
+  idx : Fin (n + 2)
+
+deriving instance DecidableEq for TwoDFA.Config
+
+instance (n : Nat) (σ : Type _) [fin_states : Fintype σ] [DecidableEq σ] : Fintype (TwoDFA.Config σ n) where
+  elems := (Fin.fintype (n+2)).elems.product fin_states.elems |>.image fun (i, q) ↦ ⟨q, i⟩
+  complete := by rintro ⟨q, i⟩; simp [Fintype.elems, fin_states.complete]
+
+structure Word (α : Type _) (n : Nat) : Type _ where
   val : Vector α n
 
-def Word.empty {α : Type u} : Word α 0 := ⟨#[].toVector⟩
+section Word
 
-def List.toWord {α : Type u} (l : List α) : Word α (l.length) :=
+variable {α : Type _}
+
+def Word.empty : Word α 0 := ⟨#[].toVector⟩
+
+def List.toWord (l : List α) : Word α (l.length) :=
   ⟨ l.toArray.toVector ⟩
 
-def Word.get {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbol α :=
+instance (x : List α) : CoeDep (List α) x (Word α (x.length)) where
+  coe := x.toWord
+
+def Word.get {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbol α :=
   if h : i = 0
     then .left
     else
@@ -46,10 +92,12 @@ def Word.get {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbo
           let ltN := Fin.val_lt_last h
           w.val.get <| k.castLT ltN
 
-def Word.split_type (α : Type u) {n : Nat} (i : Fin (n+2)) (h : i ≠ 0) : Type u := 
+abbrev Word.split_type (α : Type _) {n : Nat} (i : Fin (n+2)) (h : i ≠ 0) : Type _ := 
   (Vector α (min (i.pred h) n) × Vector α (n - (i.pred h)))
 
 --- Split the word before symbol i. Note that we can't split with i=0, since that would be trying to split before the left endmarker
-def Word.split {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_type α i h :=
+def Word.split {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_type α i h :=
   let last := i.pred h
   (Vector.cast (by simp [h, last]) <| w.val.take last, Vector.cast (by simp [h, last]) <| w.val.drop last)
+
+end Word
