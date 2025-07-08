@@ -23,38 +23,6 @@ structure TwoDFA (α σ : Type*) : Type _ where
   halt_move_right : ∀ a : α, step a accept = (accept, Movement.right) ∧ step a reject = (reject, Movement.right)
   halt_preserve_state : ∀ a : TapeSymbol α, (∃ m : Movement, step a accept = (accept, m)) ∧ (∃ m : Movement, step a reject = (reject, m))
 
-theorem TwoDFA.accept_at_leftEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .left m.accept = (m.accept, .right) := by
-  have hinBounds := m.in_bounds_left m.accept
-  have hpreserve := m.halt_preserve_state .left
-  cases hinBounds with
-  | intro wBounds hBounds => cases hpreserve.left with
-                             | intro wPres hPres => rw [hBounds, Prod.ext_iff] at hPres
-                                                    simp only at hPres
-                                                    rw [hPres.left] at hBounds
-                                                    exact hBounds
-
-theorem TwoDFA.accept_not_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) {a : TapeSymbol α} (h : a ≠ .right) : m.step a m.accept = (m.accept, .right) := by
-  cases a with
-  | left => exact m.accept_at_leftEnd
-  | right => contradiction
-  | symbol a => exact m.halt_move_right a |>.left
-
-theorem TwoDFA.reject_at_leftEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .left m.reject = (m.reject, .right) := by
-  have hinBounds := m.in_bounds_left m.reject
-  have hpreserve := m.halt_preserve_state .left
-  cases hinBounds with
-  | intro wBounds hBounds => cases hpreserve.right with
-                             | intro wPres hPres => rw [hBounds, Prod.ext_iff] at hPres
-                                                    simp only at hPres
-                                                    rw [hPres.left] at hBounds
-                                                    exact hBounds
-
-theorem TwoDFA.reject_not_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) {a : TapeSymbol α} (h : a ≠ .right) : m.step a m.reject = (m.reject, .right) := by
-  cases a with
-  | left => exact m.reject_at_leftEnd
-  | right => contradiction
-  | symbol a => exact m.halt_move_right a |>.right
-
 @[ext]
 structure TwoDFA.Config (σ : Type _) (n : Nat) where
   state : σ

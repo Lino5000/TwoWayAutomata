@@ -2,9 +2,10 @@ import Mathlib.Computability.Language
 import Mathlib.Data.Fin.Basic
 
 import TwoWayAutomata.Kozen.Basics
-import TwoWayAutomata.Kozen.Word
-import TwoWayAutomata.Kozen.Movement
 import TwoWayAutomata.Kozen.Configurations
+import TwoWayAutomata.Kozen.Lemmas
+import TwoWayAutomata.Kozen.Movement
+import TwoWayAutomata.Kozen.Word
 
 variable {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (x : Word α n) 
 
@@ -17,7 +18,11 @@ inductive GoesTo (start : Config σ n) : Config σ n → Prop
   | refl : GoesTo start start
   | tail {mid stp : Config σ n} (head : GoesTo start mid) (tail : m.nextConfig x mid stp) : GoesTo start stp
 
+
 namespace GoesTo
+
+@[refl]
+lemma reflexive {c : Config σ n} : m.GoesTo x c c := .refl
 
 @[trans]
 theorem trans {start mid stp : Config σ n} (ha : m.GoesTo x start mid) (hb : m.GoesTo x mid stp) : m.GoesTo x start stp := by
@@ -64,9 +69,7 @@ theorem accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.accept
     apply GoesTo.tail
     · suffices m.GoesTo x ⟨ m.accept, i ⟩ ⟨ m.accept, prevIdx ⟩ from this
       if heq : prevIdx = i
-        then
-          rw [heq]
-          exact .refl
+        then rw [heq]
         else
           apply accept_lt_accept i prevIdx
           have prev_def : prevIdx = j.predCast j_ne_zero := rfl

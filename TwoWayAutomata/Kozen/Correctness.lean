@@ -1,8 +1,9 @@
 import TwoWayAutomata.Kozen.Basics
-import TwoWayAutomata.Kozen.Word
-import TwoWayAutomata.Kozen.Movement
 import TwoWayAutomata.Kozen.Configurations
+import TwoWayAutomata.Kozen.Execute
 import TwoWayAutomata.Kozen.Language
+import TwoWayAutomata.Kozen.Movement
+import TwoWayAutomata.Kozen.Word
 
 variable {n : Nat} {α σ : Type*}
 
