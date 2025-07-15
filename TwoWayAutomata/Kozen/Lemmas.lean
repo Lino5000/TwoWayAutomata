@@ -6,14 +6,11 @@ import TwoWayAutomata.Kozen.Configurations
 namespace TwoDFA
 
 theorem accept_at_leftEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .left m.accept = (m.accept, .right) := by
-  have hinBounds := m.in_bounds_left m.accept
-  have hpreserve := m.halt_preserve_state .left
-  cases hinBounds with
-  | intro wBounds hBounds => cases hpreserve.left with
-                             | intro wPres hPres => rw [hBounds, Prod.ext_iff] at hPres
-                                                    simp only at hPres
-                                                    rw [hPres.left] at hBounds
-                                                    exact hBounds
+  obtain ⟨_, hBounds⟩ := m.in_bounds_left m.accept
+  obtain ⟨⟨_, hPres⟩, _⟩ := m.halt_preserve_state .left
+  rw [hBounds, Prod.ext_iff] at hPres
+  simp only at hPres
+  rwa [hPres.left] at hBounds
 
 theorem accept_not_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) {a : TapeSymbol α} (h : a ≠ .right) : m.step a m.accept = (m.accept, .right) := by
   cases a with
@@ -21,21 +18,32 @@ theorem accept_not_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) {a : TapeSymbo
   | right => contradiction
   | symbol a => exact m.halt_move_right a |>.left
 
+theorem accept_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .right m.accept = (m.accept, .left) := by
+  obtain ⟨_, hBounds⟩ := m.in_bounds_right m.accept
+  obtain ⟨⟨_, hPres⟩, _⟩ := m.halt_preserve_state .right
+  rw [hBounds, Prod.ext_iff] at hPres
+  simp only at hPres
+  rwa [hPres.left] at hBounds
+
 theorem reject_at_leftEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .left m.reject = (m.reject, .right) := by
-  have hinBounds := m.in_bounds_left m.reject
-  have hpreserve := m.halt_preserve_state .left
-  cases hinBounds with
-  | intro wBounds hBounds => cases hpreserve.right with
-                             | intro wPres hPres => rw [hBounds, Prod.ext_iff] at hPres
-                                                    simp only at hPres
-                                                    rw [hPres.left] at hBounds
-                                                    exact hBounds
+  obtain ⟨_, hBounds⟩ := m.in_bounds_left m.reject
+  obtain ⟨_, ⟨_, hPres⟩⟩ := m.halt_preserve_state .left
+  rw [hBounds, Prod.ext_iff] at hPres
+  simp only at hPres
+  rwa [hPres.left] at hBounds
 
 theorem reject_not_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) {a : TapeSymbol α} (h : a ≠ .right) : m.step a m.reject = (m.reject, .right) := by
   cases a with
   | left => exact m.reject_at_leftEnd
   | right => contradiction
   | symbol a => exact m.halt_move_right a |>.right
+
+theorem reject_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .right m.reject = (m.reject, .left) := by
+  obtain ⟨_, hBounds⟩ := m.in_bounds_right m.reject
+  obtain ⟨_, ⟨_, hPres⟩⟩ := m.halt_preserve_state .right
+  rw [hBounds, Prod.ext_iff] at hPres
+  simp only at hPres
+  rwa [hPres.left] at hBounds
 
 theorem config_accept_at_leftEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
     m.nextConfig w ⟨m.accept, 0⟩ ⟨m.accept, 1⟩ := by
@@ -55,6 +63,15 @@ theorem config_accept_not_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α �
   · simp [Movement.apply, Fin.castLT]
   · constructor <;> simp [h]
 
+theorem config_accept_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
+    m.nextConfig w ⟨m.accept, Fin.last _⟩ ⟨m.accept, (Fin.last _).predCast <| by simp⟩ := by
+  have get_right := w.get_eq_right_of_eq_last rfl
+  have step_accept := m.accept_at_rightEnd
+  left
+  · simpa [get_right]
+  · simp [Movement.apply, Fin.castLT]
+  · constructor <;> simp
+
 theorem config_reject_at_leftEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
     m.nextConfig w ⟨m.reject, 0⟩ ⟨m.reject, 1⟩ := by
   have get_left := w.get_eq_left_of_eq_zero rfl
@@ -72,5 +89,21 @@ theorem config_reject_not_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α �
   · simpa
   · simp [Movement.apply, Fin.castLT]
   · constructor <;> simp [h]
+
+theorem config_reject_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
+    m.nextConfig w ⟨m.reject, Fin.last _⟩ ⟨m.reject, (Fin.last _).predCast <| by simp⟩ := by
+  have get_right := w.get_eq_right_of_eq_last rfl
+  have step_reject := m.reject_at_rightEnd
+  left
+  · simpa [get_right]
+  · simp [Movement.apply, Fin.castLT]
+  · constructor <;> simp
+
+theorem nextConfig.irrefl {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) (c : Config σ n) : ¬m.nextConfig w c c := by
+  by_contra h
+  rcases h with ⟨_, hval, _⟩ | ⟨_, hval, _⟩
+  all_goals
+    have := Movement.apply_ne_self _ _ hval
+    contradiction
 
 end TwoDFA

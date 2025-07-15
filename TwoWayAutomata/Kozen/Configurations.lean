@@ -71,4 +71,41 @@ theorem nextConfig.push_eq (c1 : Config σ n) (c2 : Config σ (n+1)) {move : Mov
     · suffices Movement.right.apply (c1.castLE <| by simp).idx hvalid = c2.idx from this
       exact hmove
 
+def stepConfig : Config σ n → Config σ n
+  | ⟨ state, idx ⟩ => match hstep : m.step (x.get idx) state with
+                      | ⟨ nextState, move ⟩ =>
+                        let hvalid : move.isValid idx := m.step_move_always_valid hstep
+                        ⟨ nextState, move.apply idx hvalid ⟩
+
+theorem stepConfig_gives_nextConfig (c1 c2 : Config σ n) : m.stepConfig x c1 = c2 ↔ m.nextConfig x c1 c2 where
+  mp := by
+    intro h 
+    rcases hstep : m.step (x.get c1.idx) c1.state with ⟨t, move⟩
+    simp [hstep, stepConfig, Config.ext_iff] at h
+    cases hmove : move
+    · left
+      · rwa [← h.left, ← hmove]
+      · rw [← h.right]
+        simp only [hmove]
+      · rw [← hmove]
+        exact move.isValid_of_apply _ _ h.right
+    · right
+      · rwa [← h.left, ← hmove]
+      · rw [← h.right]
+        simp only [hmove]
+      · rw [← hmove]
+        exact move.isValid_of_apply _ _ h.right
+  mpr := by
+    rintro (⟨hstep, _, happly⟩ | ⟨hstep, _, happly⟩)
+    all_goals
+      simp only [stepConfig, hstep]
+      ext
+      · simp only
+      · simp only [happly]
+
+theorem nextConfig_right_unique {m : TwoDFA α σ} {x : Word α n} {strt c1 c2 : Config σ n}
+  (h1 : m.nextConfig x strt c1) (h2 : m.nextConfig x strt c2) : c1 = c2 := by
+    rw [←stepConfig_gives_nextConfig] at h1 h2
+    exact h1.symm.trans h2
+
 end TwoDFA

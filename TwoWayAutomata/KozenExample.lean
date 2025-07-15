@@ -432,7 +432,12 @@ theorem exampleOnesPass {n : Nat} (w : Word (Fin 2) n) (j : Fin 2) (hcount : w.v
       simp [Movement.apply, Fin.predCast]
     else
       apply exampleOnesPass_ofCount hn (i := 0) (h := by simp) (j := j)
-      simp [Word.split, hcount]
+      have : 1 % (n + 1 + 1 + 1) = 1 := Nat.one_mod_eq_one.mpr <| by simp
+      simp only [Fin.coe_pred, Fin.coe_castLT, Fin.succ_zero_eq_one, Fin.coe_ofNat_eq_mod,
+        Fin.isValue, Word.split, Vector.take_eq_extract, Vector.cast_rfl,
+        Vector.drop_eq_cast_extract, Vector.count_cast]
+      rw [this]
+      simpa
 
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
   atLeft
@@ -441,10 +446,10 @@ def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState
     | .t  , word => (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = 0
     | .r  , word => (word.count 0) % 3 ≠ 0 ∨ (word.count 1) % 2 = 1
   inWord
-    | .q j, _, _ => fun ⟨wleft, _⟩ ↦ wleft.count 0 % 3 = ↑j
-    | .p j, _, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ wright.tail.count 1 % 2 = ↑j
-    | .t  , _, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0
-    | .r  , _, _ => fun ⟨wleft, wright⟩ ↦ ¬((wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0)
+    | .q j, _ => fun ⟨wleft, _⟩ ↦ wleft.count 0 % 3 = ↑j
+    | .p j, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ wright.tail.count 1 % 2 = ↑j
+    | .t  , _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0
+    | .r  , _ => fun ⟨wleft, wright⟩ ↦ ¬((wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0)
 
 theorem exampleCMBase {n : Nat} (w : Word (Fin 2) n) : exampleConfigMeaning.apply w ⟨example2DFA.start, 0⟩ := by
   simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, example2DFA]
@@ -777,8 +782,10 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
     conv at this =>
       simp only [TwoDFA.ConfigMeaning.apply, Fin.last_eq_zero_iff, Nat.add_eq_zero,
         List.length_eq_zero_iff, one_ne_zero, and_false, ↓reduceDIte, exampleConfigMeaning,
-        example2DFA]
-      simp only [SplitPredicate.apply, Word.split_append, Vector.count_cast, ←list_count_eq_vector_count]
+        Fin.isValue, ne_eq, Fin.coe_pred, Function.const_apply, example2DFA]
+      simp only [SplitPredicate.apply]
+      rw [Word.split_append]
+      simp only [Vector.count_cast, ←list_count_eq_vector_count]
     exact this
 
   -- w ∈ exampleLanguage → example2DFA.accepts w
@@ -798,5 +805,12 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
     · exact TwoDFA.GoesTo.trans example2DFA w.toWord zerosPass onesPass
     · simp [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, example2DFA, Word.get_eq_left_of_eq_zero rfl, exampleStep]
       simp [Movement.apply, Fin.castLT]
+
+theorem exampleTermination {n : Nat} (w : Word (Fin 2) n) : example2DFA.reaches w ⟨.t, Fin.last _⟩ ∨ example2DFA.reaches w ⟨.r, Fin.last _⟩ := by
+  rcases em (example2DFA.reaches w ⟨.t, Fin.last _⟩), em (example2DFA.reaches w ⟨.r, Fin.last _⟩) with ⟨ht | ht, hr | hr⟩
+  case inl.inr | inr.inl | inl.inl => simp [ht, hr]  -- assumed to reach .t or .r, trivial
+  case inr.inr =>  -- If we don't reach either we must be in a cycle, but for this machine that is impossible
+    exfalso
+    sorry
 
 end example2DFA

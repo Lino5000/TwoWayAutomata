@@ -129,6 +129,18 @@ theorem Movement.lt_of_apply_left {n : Nat} (i : Fin (n+2)) {valid : Movement.le
   apply Nat.sub_lt_of_pos_le <| by simp
   exact Movement.one_le_of_left_isValid i valid
 
+theorem Movement.apply_ne_self {n : Nat} (i : Fin (n+2)) (mov : Movement) (valid : mov.isValid i) : mov.apply i valid ≠ i := by
+  by_contra heq
+  cases mov
+  all_goals simp [apply, ←Fin.val_inj] at heq
+  -- move right is discharged by simp, just need a little more for left
+  suffices i.val ≠ 0 by
+    have := Nat.sub_one_ne_self (a := i.val) this
+    contradiction
+  have := valid.hleft
+  simp only [and_true, ←ne_eq] at this
+  rwa [Fin.ne_iff_vne, Fin.val_zero] at this
+
 theorem TwoDFA.step_move_always_valid {α : Type _} {σ : Type _} (m : TwoDFA α σ) {n : Nat} {x : Word α n}
      {i : Fin (n+2)} {move : Movement} {s t : σ} (h : m.step (x.get i) s = ⟨ t, move ⟩) : move.isValid i := by
   constructor

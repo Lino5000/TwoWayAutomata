@@ -92,38 +92,6 @@ namespace TwoDFA
 
 variable {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) 
 
-def stepConfig : Config σ n → Config σ n
-  | ⟨ state, idx ⟩ => match hstep : m.step (w.get idx) state with
-                      | ⟨ nextState, move ⟩ =>
-                        let hvalid : move.isValid idx := m.step_move_always_valid hstep
-                        ⟨ nextState, move.apply idx hvalid ⟩
-
-theorem stepConfig_gives_nextConfig (c1 c2 : Config σ n) : m.stepConfig w c1 = c2 ↔ m.nextConfig w c1 c2 where
-  mp := by
-    intro h 
-    rcases hstep : m.step (w.get c1.idx) c1.state with ⟨t, move⟩
-    simp [hstep, stepConfig, Config.ext_iff] at h
-    cases hmove : move
-    · left
-      · rwa [← h.left, ← hmove]
-      · rw [← h.right]
-        simp only [hmove]
-      · rw [← hmove]
-        exact move.isValid_of_apply _ _ h.right
-    · right
-      · rwa [← h.left, ← hmove]
-      · rw [← h.right]
-        simp only [hmove]
-      · rw [← hmove]
-        exact move.isValid_of_apply _ _ h.right
-  mpr := by
-    rintro (⟨hstep, _, happly⟩ | ⟨hstep, _, happly⟩)
-    all_goals
-      simp only [stepConfig, hstep]
-      ext
-      · simp only
-      · simp only [happly]
-
 def stepTimes (steps : Nat) (strt : Config σ n) : Config σ n :=
   match steps with
   | 0 => strt

@@ -51,7 +51,7 @@ theorem TwoDFA.ReachesIn_of_GoesTo {start stp : Config σ n} (h : m.GoesTo x sta
 theorem TwoDFA.GoesTo_of_ReachesIn {start stp : Config σ n} {l : Nat} (h : m.ReachesIn x stp l start) : m.GoesTo x start stp := by
   induction h with
   | refl => exact .refl
-  | step hhead _ hind => exact GoesTo.head m x hhead hind
+  | step hhead _ hind => exact GoesTo.head hhead hind
 
 theorem TwoDFA.GoesTo_iff_ReachesIn {start stp : Config σ n} : m.GoesTo x start stp ↔ ∃ l : Nat, m.ReachesIn x stp l start where
   mp := ReachesIn_of_GoesTo m x
