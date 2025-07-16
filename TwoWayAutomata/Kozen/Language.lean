@@ -433,6 +433,16 @@ theorem reaches_runOn (i : Nat) : m.reaches x (m.runOn x i) := by
     arg 3; simp only [runOn, init]
   assumption
 
+theorem runOn_of_reaches (c : Config σ n) (h : m.reaches x c) : ∃ k, m.runOn x k = c := by
+  induction h with
+  | refl => exists 0
+  | tail _ tl ih =>
+    obtain ⟨k, hrun⟩ := ih
+    use k+1
+    apply nextConfig_right_unique _ tl
+    rw [←hrun]
+    apply runOn_step
+
 theorem cycle_of_run_repeats (i k : Nat) (h1 : k ≠ 0) (h2 : m.runOn x i = m.runOn x (i+k)) : m.CyclesAt x (m.runOn x i) := by
   cases k with
   | zero => contradiction

@@ -30,9 +30,25 @@ structure TwoDFA.Config (σ : Type _) (n : Nat) where
 
 deriving instance DecidableEq for TwoDFA.Config
 
-instance (n : Nat) (σ : Type _) [fin_states : Fintype σ] [DecidableEq σ] : Fintype (TwoDFA.Config σ n) where
-  elems := (Fin.fintype (n+2)).elems.product fin_states.elems |>.image fun (i, q) ↦ ⟨q, i⟩
-  complete := by rintro ⟨q, i⟩; simp [Fintype.elems, fin_states.complete]
+instance (n : Nat) (σ : Type _) [fin_states : Fintype σ] : Fintype (TwoDFA.Config σ n) where
+  elems := by
+    let f (x : Fin (n+2) × σ) : TwoDFA.Config σ n := ⟨x.2, x.1⟩
+    constructor; swap
+    · exact ((Fin.fintype (n+2)).elems.product fin_states.elems).val.map f
+    · apply Multiset.Nodup.map_on
+      · intro _ _ _ _ hf
+        simp only [TwoDFA.Config.mk.injEq, f] at hf
+        ext <;> simp [hf]
+      · apply Multiset.Nodup.product <;> exact Fintype.elems.nodup
+  complete := by
+    rintro ⟨q, i⟩
+    simp only [Finset.mem_def, Multiset.mem_map]
+    use (i, q)
+    simp only [and_true]
+    suffices (i, q) ∈ Fintype.elems.val.product Fintype.elems.val by
+      rwa [Finset.product_eq_sprod, Finset.product_val]
+    simp only [Multiset.mem_product, Finset.mem_val]
+    constructor <;> apply Fintype.complete
 
 structure Word (α : Type _) (n : Nat) : Type _ where
   val : Vector α n
