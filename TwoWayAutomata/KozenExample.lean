@@ -1,4 +1,5 @@
-import TwoWayAutomata.Kozen
+import TwoWayAutomata.Kozen.Correctness
+import TwoWayAutomata.Kozen.Termination
 
 theorem Vector.count_tail {α : Type _} [BEq α] (n : Nat) (w : Vector α (n+1)) (a : α) : Vector.count a w = Vector.count a w.tail + if w[0] == a then 1 else 0 := by
   have eq_push_front : w = w.tail.insertIdx 0 w[0] := by

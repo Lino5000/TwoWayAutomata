@@ -1,4 +1,5 @@
-import TwoWayAutomata.Kozen
+import TwoWayAutomata.Kozen.Correctness
+import TwoWayAutomata.Kozen.Termination
 
 abbrev allOnes (x : List (Fin 2)) : Prop := x.all (· == 1)
 
