@@ -249,6 +249,46 @@ theorem accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.accept
     exact Movement.lt_of_apply_left j
   }
 
+theorem reject_lt_reject (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.reject, i ⟩ ⟨ m.reject, j ⟩ := by
+  have j_ne_zero : j ≠ 0 := Fin.ne_zero_of_lt h
+  have one_le_j : 1 ≤ j.val := by
+    suffices 1 ≤ j by simpa
+    exact Fin.one_le_of_ne_zero j_ne_zero
+  cases ha : x.get i with
+  | right =>
+    rw [Word.eq_last_of_get_eq_right ha] at h
+    suffices ¬ Fin.last (n+1) < j by contradiction
+    simp [j.le_last]
+  | left | symbol a =>
+    clear ha
+    have left_isValid_j : Movement.left.isValid j := by constructor <;> simp [j_ne_zero]
+    let prevIdx := Movement.left.apply j left_isValid_j
+    apply GoesTo.tail
+    · suffices m.GoesTo x ⟨ m.reject, i ⟩ ⟨ m.reject, prevIdx ⟩ from this
+      if heq : prevIdx = i
+        then rw [heq]
+        else
+          apply reject_lt_reject i prevIdx
+          have prev_def : prevIdx = j.predCast j_ne_zero := rfl
+          suffices i ≤ prevIdx by simp [Fin.lt_iff_le_and_ne, this, heq, Ne.symm]
+          rw [Fin.lt_def] at h
+          simpa [prev_def, Fin.le_def, Nat.le_sub_iff_add_le one_le_j]
+    · have prevIdx_ne_last : prevIdx ≠ Fin.last (n+1) := by
+        apply Fin.ne_of_lt
+        have : prevIdx < j := Movement.lt_of_apply_left j
+        apply Fin.lt_of_lt_of_le this
+        exact j.le_last
+      right
+      · simp only
+        suffices x.get prevIdx ≠ .right from m.reject_not_at_rightEnd this
+        exact Word.get_neq_right_of_neq_last prevIdx_ne_last
+      · exact Movement.left.opp_cancel_of_valid j left_isValid_j
+  termination_by j
+  decreasing_by all_goals {
+    simp only [Fin.val_fin_lt]
+    exact Movement.lt_of_apply_left j
+  }
+
 
 theorem reaches_accept_last_of_accepts (haccept : m.accepts x) : m.reaches x ⟨ m.accept, Fin.last (n+1) ⟩ := by
   rcases haccept with ⟨idx, hidx⟩
@@ -260,6 +300,18 @@ theorem reaches_accept_last_of_accepts (haccept : m.accepts x) : m.reaches x ⟨
       · exact hidx
       · apply m.accept_lt_accept x idx (Fin.last _)
         exact Fin.lt_last_iff_ne_last.mpr h
+
+theorem reaches_reject_last_of_rejects (hreject : m.rejects x) : m.reaches x ⟨ m.reject, Fin.last (n+1) ⟩ := by
+  rcases hreject with ⟨idx, hidx⟩
+  if h : idx = Fin.last (n+1)
+    then rwa [← h]
+    else
+      unfold reaches
+      trans
+      · exact hidx
+      · apply m.reject_lt_reject x idx (Fin.last _)
+        exact Fin.lt_last_iff_ne_last.mpr h
+
 
 theorem single_path {strt stp1 stp2 : Config σ n} (h1 : m.GoesTo x strt stp1) (h2 : m.GoesTo x strt stp2) : m.GoesTo x stp1 stp2 ∨ m.GoesTo x stp2 stp1 := by
   induction h1 using GoesTo.head_induction_on with
@@ -490,7 +542,7 @@ theorem will_cycle [Fintype (Config σ n)] : ∃ c, m.reaches x c ∧ m.CyclesAt
 
 end Runs
 
-theorem divergence_iff [Fintype (Config σ n)] : m.diverges x ↔ (¬m.accepts x ∧ ¬m.rejects x) where
+theorem divergence_iff [Fintype σ] : m.diverges x ↔ (¬m.accepts x ∧ ¬m.rejects x) where
   mp := by
     intro hdiv
     by_contra hterm

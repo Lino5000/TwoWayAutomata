@@ -129,6 +129,11 @@ theorem Movement.lt_of_apply_left {n : Nat} (i : Fin (n+2)) {valid : Movement.le
   apply Nat.sub_lt_of_pos_le <| by simp
   exact Movement.one_le_of_left_isValid i valid
 
+theorem Movement.lt_apply_right {n : Nat} (i : Fin (n+2)) {valid : Movement.right.isValid i} :
+    i < Movement.right.apply i valid := by
+  unfold Movement.apply
+  simp [Fin.lt_def]
+
 theorem Movement.apply_ne_self {n : Nat} (i : Fin (n+2)) (mov : Movement) (valid : mov.isValid i) : mov.apply i valid ≠ i := by
   by_contra heq
   cases mov

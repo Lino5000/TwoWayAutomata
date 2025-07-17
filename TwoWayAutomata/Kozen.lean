@@ -9,6 +9,7 @@ import TwoWayAutomata.Kozen.Movement
 import TwoWayAutomata.Kozen.Configurations
 import TwoWayAutomata.Kozen.Language
 import TwoWayAutomata.Kozen.Correctness
+import TwoWayAutomata.Kozen.Termination
 
 section Evaluation
 
