@@ -1,7 +1,5 @@
 import TwoWayAutomata.Kozen
 
-section example2DFA
-
 theorem Vector.count_tail {α : Type _} [BEq α] (n : Nat) (w : Vector α (n+1)) (a : α) : Vector.count a w = Vector.count a w.tail + if w[0] == a then 1 else 0 := by
   have eq_push_front : w = w.tail.insertIdx 0 w[0] := by
     suffices #[w[0]] = w.toArray.extract 0 1 by simp [insertIdx, this, Array.extract_eq_self_of_le]
@@ -20,9 +18,10 @@ theorem Vector.tail_cast {α : Type _} {n m : Nat} (w : Vector α n) (h : n = m)
 abbrev tripleZeros (x : List (Fin 2)) : Prop := (x.count 0) % 3 = 0
 abbrev evenOnes (x : List (Fin 2)) : Prop := (x.count 1) % 2 = 0
 
-def exampleLanguage : Language (Fin 2) := 
-  { x : List (Fin 2) | tripleZeros x ∧ evenOnes x }
+def exampleLanguage : Language (Fin 2) := { x | tripleZeros x ∧ evenOnes x }
 
+
+section example2DFA
 
 inductive ExampleState : Type where
   | q : Fin 3 → ExampleState
@@ -106,8 +105,7 @@ def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState
 theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) example2DFA where
   base := by simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, example2DFA]
   ind := by
-    intro w cfg hind
-    let ⟨state, idx⟩ := cfg
+    rintro w ⟨state, idx⟩ hind
     let get_res := w.get idx
     match hstate : state, hget : get_res with
     | .t, .left | .t, .symbol a
@@ -415,7 +413,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
                 rw [count_tail, Nat.add_mod, hind.right, Word.split_2_getElem, this]
                 simp [ha]
 
-def term_encoding : TwoDFA.WellFoundedEncoding ExampleState where
+def cfg_encoding : TwoDFA.WellFoundedEncoding ExampleState where
   E := fun n ↦ Nat × Fin (n+2)
   wfrel := {
     rel := Prod.Lex LT.lt LT.lt,
@@ -474,9 +472,9 @@ lemma example_p_to_p_left {j1 j2 : Fin 2} {a : TapeSymbol (Fin 2)} (h : (example
 
 theorem example_never_diverges {n : Nat} (w : Word (Fin 2) n) : ¬ example2DFA.diverges w := by
   apply TwoDFA.halts_of_next_except_halt_WF
-  apply TwoDFA.next_except_halt_WF_of_encoding _ term_encoding
+  apply TwoDFA.next_except_halt_WF_of_encoding _ cfg_encoding
   rintro c1 c2 ⟨hna, hnr, hnext⟩
-  simp only [term_encoding, TwoDFA.WellFoundedEncoding.rel]
+  simp only [cfg_encoding, TwoDFA.WellFoundedEncoding.rel]
   match c1, c2 with
   | ⟨.q j1, p1⟩, ⟨.q j2, p2⟩ => 
     simp only

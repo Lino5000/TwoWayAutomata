@@ -99,11 +99,33 @@ theorem config_reject_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (
   · simp [Movement.apply, Fin.castLT]
   · constructor <;> simp
 
+@[simp]
 theorem nextConfig.irrefl {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) (c : Config σ n) : ¬m.nextConfig w c c := by
   by_contra h
   rcases h with ⟨_, hval, _⟩ | ⟨_, hval, _⟩
   all_goals
     have := Movement.apply_ne_self _ _ hval
     contradiction
+
+@[simp]
+theorem nextConfig.halt_preserve_state {α σ : Type*} {n : Nat} {m : TwoDFA α σ} {w : Word α n} {c1 c2 : Config σ n}
+  (hnext : m.nextConfig w c1 c2) (hlt : c1.state = m.accept ∨ c1.state = m.reject) :
+    c2.state = c1.state := by
+  rcases hlt with hlt | hlt
+  case' inl =>
+    have c1_def : c1 = ⟨m.accept, c1.idx⟩ := by rw [←hlt]
+    obtain ⟨mv, hstep⟩ := m.halt_preserve_state (w.get c1.idx) |>.left
+  case' inr =>
+    have c1_def : c1 = ⟨m.reject, c1.idx⟩ := by rw [←hlt]
+    obtain ⟨mv, hstep⟩ := m.halt_preserve_state (w.get c1.idx) |>.right
+  all_goals
+    rw [hlt]
+    conv at hnext =>
+      rw [←stepConfig_gives_nextConfig, c1_def]
+      simp only [stepConfig, Config.ext_iff]
+    unfold step at hstep
+    have := hnext.left.symm
+    rw [hstep] at this
+    simpa
 
 end TwoDFA

@@ -222,6 +222,12 @@ theorem Fin.internal.pred_ne_last {n : Nat} {i : Fin (n+2)} (int : i.internal) :
   · exact int.i_val_ne_last
   · exact int.i_val_ne_zero
 
+@[simp]
+theorem Fin.internal.val_succ_lt {n : Nat} {i : Fin (n+2)} (int : i.internal) : i.val.succ < n + 2 := by
+  have := int.right
+  rw [←Fin.lt_last_iff_ne_last, Fin.lt_iff_val_lt_val] at this
+  simpa
+
 def Word.get_eq_symbol_of_internal {α : Type u} {n : Nat} (w : Word α n) {i : Fin (n+2)} (int : i.internal) :
     w.get i = .symbol (w.val.get int.val) := by
   have not_left : w.get i ≠ .left := Word.get_neq_left_of_neq_zero int.left
@@ -265,6 +271,10 @@ def Word.getInternal {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (in
 theorem Word.getInternal_eq_getElem {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (int : i.internal) :
     w.getInternal i int = w.val[int.val] := by
   simp [getInternal, Vector.get]
+
+theorem Word.getInternal_eq_get {α : Type _} {n : Nat} (w : Word α n) (i : Fin (n+2)) (int : i.internal) :
+    w.getInternal i int = w.get i := by
+  simp [getInternal, get, int.left, int.pred_ne_last, Fin.internal.val]
 
 -- Extract from the word ⊢ w₁ ... wₙ ⊣ the list of symbols wᵢ... wⱼ₋₁ with i=start and j=stop
 def Word.extract {α : Type u} {n : Nat} (w : Word α n) (start stop : Fin (n+2)) (h1 : start.internal) (h2 : stop ≠ 0) :
