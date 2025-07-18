@@ -507,6 +507,11 @@ theorem cycle_of_run_repeats (i k : Nat) (h1 : k ≠ 0) (h2 : m.runOn x i = m.ru
     · rw [h2]
       apply runOn_step
 
+theorem run_repeats_offset {step1 step2 off : Nat} (h : m.runOn x step1 = m.runOn x step2) : m.runOn x (step1 + off) = m.runOn x (step2 + off) := by
+  induction off with
+  | zero => exact h
+  | succ off ih => simp [runOn, ih]
+
 theorem run_repeats [fin_card : Fintype (Config σ n)] : ∃ i k : Nat, k ≠ 0 ∧ m.runOn x i = m.runOn x (i + k) := by
   obtain ⟨u, v, hne, hrep⟩ := Finite.exists_ne_map_eq_of_infinite (m.runOn x)
   rcases em (u < v) with hlt | hlt
@@ -533,7 +538,7 @@ theorem run_repeats [fin_card : Fintype (Config σ n)] : ∃ i k : Nat, k ≠ 0 
     · simpa [hadd] using hrep
 
 --- Every 2DFA will end up in a cycle on every input. The "halting" behaviour is actually entering the `accept_cycle` or the `reject_cycle`
-theorem will_cycle [Fintype (Config σ n)] : ∃ c, m.reaches x c ∧ m.CyclesAt x c := by
+theorem will_cycle [Fintype σ] : ∃ c, m.reaches x c ∧ m.CyclesAt x c := by
   obtain ⟨i, k, hne, hrep⟩ := m.run_repeats x
   use m.runOn x i
   constructor
