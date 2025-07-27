@@ -5,9 +5,66 @@ import Mathlib.Computability.DFA
 import TwoWayAutomata.Kozen.Language
 import TwoWayAutomata.Kozen.Correctness
 
+theorem Option.ne_some {α : Type _} (o : Option α) {a : α} (h : o ≠ some a) : o = none ∨ ∃ b : α, b ≠ a ∧ o = some b := by
+  cases o with
+  | none => simp
+  | some b => right; use b; simpa using h
+
 namespace TwoDFA
 
 variable {α σ : Type*}
+
+inductive GoesLeftOf {n : Nat} (m : TwoDFA α σ) (w : Word α n) (i : Fin (n+2)) : Config σ n → Config σ n → Prop where
+  | refl {cfg : Config σ n} : m.GoesLeftOf w i cfg cfg
+  | tail {strt mid stp : Config σ n} (hlt : mid.idx ≤ i) (head : m.GoesLeftOf w i strt mid) (tail : m.nextConfig w mid stp) : m.GoesLeftOf w i strt stp
+
+namespace GoesLeftOf
+
+variable {n : Nat} (m : TwoDFA α σ) (w : Word α n) (i : Fin (n+2)) 
+
+@[refl]
+theorem reflexive (cfg : Config σ n) : m.GoesLeftOf w i cfg cfg := .refl
+
+theorem forget {cfg1 cfg2 : Config σ n} (h : m.GoesLeftOf w i cfg1 cfg2) : m.GoesTo w cfg1 cfg2 := by
+  induction h with
+  | refl => rfl
+  | tail _ _ tl ih => apply ih.tail tl
+
+theorem single {strt stp : Config σ n} {i : Fin _} (hlt : strt.idx ≤ i) (hnext : m.nextConfig w strt stp) : m.GoesLeftOf w i strt stp := 
+  .tail hlt .refl hnext
+
+theorem head {strt mid stp : Config σ n} (head : m.nextConfig w strt mid) (tail : m.GoesLeftOf w strt.idx mid stp) {i : Fin _} (hidx : i = strt.idx) : m.GoesLeftOf w i strt stp := by
+  induction tail with
+  | refl => exact .tail (by rw [hidx]) .refl head
+  | tail hlt _ tl ih =>
+    rw [←hidx] at hlt
+    exact ih.tail hlt tl
+
+@[trans]
+theorem trans {strt mid stp : Config σ n} {i : Fin _} (ha : m.GoesLeftOf w i strt mid) (hb : m.GoesLeftOf w i mid stp) : m.GoesLeftOf w i strt stp := by
+  induction hb with
+  | refl => exact ha
+  | tail hlt _ tl ih => exact ih.tail hlt tl
+
+theorem castSucc {cfg1 cfg2 : Config σ n} {i : Fin _} (h : m.GoesLeftOf w i.castSucc cfg1 cfg2) : m.GoesLeftOf w i.succ cfg1 cfg2 := by
+  induction h with
+  | refl => rfl
+  | tail hlt _ tl ih =>
+    refine .tail ?_ ih tl
+    apply hlt.trans
+    simp [Fin.le_iff_val_le_val]
+
+theorem castLE {cfg1 cfg2 : Config σ n} {i j : Fin _} (hgoes : m.GoesLeftOf w i cfg1 cfg2) (hle : i ≤ j) : m.GoesLeftOf w j cfg1 cfg2 := by
+  induction hgoes with
+  | refl => rfl
+  | tail hlt _ tl ih => exact ih.tail (hlt.trans hle) tl
+
+theorem attach {cfg1 cfg2 : Config σ n} (h : m.GoesTo w cfg1 cfg2) : m.GoesLeftOf w (Fin.last _) cfg1 cfg2 := by
+  induction h with
+  | refl => rfl
+  | tail _ tl ih => exact ih.tail (Fin.le_last _) tl
+
+end GoesLeftOf
 
 --- A "table" that stores all the information needed to completely reconstruct the behaviour of a given 2DFA on a fixed input prefix.
 structure BackTable (σ : Type _) : Type _ where
@@ -90,8 +147,8 @@ theorem table_for_step {m : TwoDFA α σ} (w : List α) (a : α) : m.step_table 
 
 omit [Fintype σ] in
 theorem table_for_step_right {m : TwoDFA α σ} (t : BackTable σ) (w : List α) (i : Fin (w.length+1)) (hi : i < w.length) (p q : σ) (fuel : Nat) (hmap : step_right.go m t w[↑i] p fuel = some q)
-  (hind : ∀ (p q : σ), t.map p = some q → m.GoesTo w.toWord { state := p, idx := i.castSucc } { state := q, idx := i.succ }) :
-    m.GoesTo w.toWord { state := p, idx := i.succ } { state := q, idx := i.succ + 1 } := by
+  (hind : ∀ (p q : σ), t.map p = some q → m.GoesLeftOf w.toWord i.castSucc { state := p, idx := i.castSucc } { state := q, idx := i.succ }) :
+    m.GoesLeftOf w.toWord i.succ { state := p, idx := i.succ } { state := q, idx := i.succ + 1 } := by
   unfold step_right.go at hmap
   cases fuel with 
   | zero => simp at hmap  -- contradiction
@@ -107,7 +164,7 @@ theorem table_for_step_right {m : TwoDFA α σ} (t : BackTable σ) (w : List α)
       simp only [Fin.getElem_fin, hstep, Option.some.injEq] at hmap
       rw [←hmap]
       have hvalid : Movement.right.isValid i.succ := by constructor <;> simp [hint.right]
-      apply GoesTo.single
+      apply GoesLeftOf.single (hlt := by rfl)
       right
       · suffices w.toWord.get i.succ = w[i.val] by simpa [this]
         rw [Word.get_eq_symbol_of_internal w.toWord hint]
@@ -121,18 +178,20 @@ theorem table_for_step_right {m : TwoDFA α σ} (t : BackTable σ) (w : List α)
         simp only [Fin.getElem_fin, hstep, Option.bind_eq_bind]
         rw [Option.bind_eq_some_iff]
       obtain ⟨q', hmap', hstep'⟩ := hmap
-      trans
-      · apply GoesTo.head
-        have hvalid : Movement.left.isValid i.succ := by constructor <;> simp
-        · apply nextConfig.stepLeft (c2 := ⟨p', i.castSucc⟩)
-          · rw [w.toWord.get_eq_symbol_of_internal hint]
-            simp [Vector.get, List.toWord, hstep]
-          · suffices Movement.left.apply i.succ hvalid = i.castSucc by simpa
-            simp only [Movement.apply]
-            rw [←Fin.val_inj]
-            simp
-        · exact hind _ _ hmap'
-      · apply table_for_step_right (hmap := hstep') (hind := hind)
+      have : i.succ = (⟨p, i.succ⟩ : Config σ w.length).idx := rfl
+      rw [this]
+      apply GoesLeftOf.head (hidx := by rfl)
+      · have hvalid : Movement.left.isValid i.succ := by constructor <;> simp
+        apply nextConfig.stepLeft (c2 := ⟨p', i.castSucc⟩)
+        · rw [w.toWord.get_eq_symbol_of_internal hint]
+          simp [Vector.get, List.toWord, hstep]
+        · suffices Movement.left.apply i.succ hvalid = i.castSucc by simpa
+          simp only [Movement.apply]
+          rw [←Fin.val_inj]
+          simp
+      · trans
+        · apply (hind _ _ hmap').castSucc
+        · apply table_for_step_right (hmap := hstep') (hind := hind)
 
 theorem table_for_take_succ {m : TwoDFA α σ} {w : List α} (i : Fin w.length) (t1 t2 : BackTable σ)
   (h1 : t1 = m.table_for (w.take i)) (h2 : t2 = m.table_for (w.take i.succ)) :
@@ -143,13 +202,13 @@ theorem table_for_take_succ {m : TwoDFA α σ} {w : List α} (i : Fin w.length) 
 
 theorem table_for_take_map (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (i : Fin (w.length + 2)) (hnelast : i ≠ Fin.last _)
   (ht : t = m.table_for (w.take i)) (p q : σ) (hmap : t.map p = some q) :
-    m.GoesTo w.toWord ⟨p, i⟩ ⟨q, i+1⟩ := by
+    m.GoesLeftOf w.toWord i ⟨p, i⟩ ⟨q, i+1⟩ := by
   induction i using Fin.inductionOn generalizing t p q with
   | zero =>
     simp only [Fin.coe_ofNat_eq_mod, Nat.zero_mod, List.take_zero, List.foldl_nil] at ht
     unfold table_for at ht
     simp [ht, first_table] at hmap
-    apply GoesTo.single
+    apply GoesLeftOf.single (hlt := by rfl)
     right
     · simp only
       rw [w.toWord.get_eq_left_of_eq_zero rfl]
@@ -177,14 +236,14 @@ theorem table_for_take_map (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (
 
 theorem table_for_take_init (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (i : Fin (w.length + 1))
   (ht : t = m.table_for (w.take i)) {q : σ} (hinit : t.init = some q)
-    : m.GoesTo w.toWord m.init ⟨q, i.succ⟩ := by
+    : m.GoesLeftOf w.toWord i.castSucc m.init ⟨q, i.succ⟩ := by
   induction i using Fin.inductionOn generalizing t q with
   | zero =>
     conv at hinit =>
       rw [ht]
       simp [table_for, first_table]
     rw [←hinit]
-    apply GoesTo.single
+    apply GoesLeftOf.single (hlt := by rfl)
     rw [←stepConfig_gives_nextConfig]
     simp only [stepConfig, Word.get_eq_left_of_eq_zero, Fin.succ_zero_eq_one, Config.mk.injEq, true_and]
     obtain ⟨_, hright⟩ := m.in_bounds_left m.start
@@ -199,7 +258,7 @@ theorem table_for_take_init (m : TwoDFA α σ) (w : List α) (t : BackTable σ) 
     rw [hinit, Option.bind_eq_some_iff] at hinit_def
     obtain ⟨prev_init, hprev, hstep_init⟩ := hinit_def
     trans
-    · exact ih prev_t rfl hprev
+    · apply (ih prev_t rfl hprev).castSucc
     · have : i.succ.succ = i.castSucc.succ + 1 := by
         rw [←Fin.val_inj]
         simp [Fin.val_add_one]
@@ -213,8 +272,8 @@ theorem table_for_take_init (m : TwoDFA α σ) (w : List α) (t : BackTable σ) 
 
 omit [Fintype σ] in
 theorem table_for_accepting_go {m : TwoDFA α σ} (t : BackTable σ) (w : List α) (p q : σ) (fuel : Nat) (hmap : accepting_table.go m t p fuel = some q)
-  (hind : ∀ (p q : σ), t.map p = some q → m.GoesTo w.toWord { state := p, idx := Fin.ofNat _ w.length } { state := q, idx := Fin.last _ }) :
-    m.GoesTo w.toWord { state := p, idx := Fin.last _ } { state := q, idx := Fin.last _ } := by
+  (hind : ∀ (p q : σ), t.map p = some q → m.GoesLeftOf w.toWord (Fin.last _) { state := p, idx := Fin.ofNat _ w.length } { state := q, idx := Fin.last _ }) :
+    m.GoesLeftOf w.toWord (Fin.last _) { state := p, idx := Fin.last _ } { state := q, idx := Fin.last _ } := by
   cases fuel with
   | zero => 
     have : p = q := by simpa [accepting_table.go] using hmap
@@ -223,7 +282,7 @@ theorem table_for_accepting_go {m : TwoDFA α σ} (t : BackTable σ) (w : List �
     obtain ⟨p', hp'⟩ := m.in_bounds_right p
     obtain ⟨q', hq', hmap'⟩ : ∃ a, t.map p' = some a ∧ accepting_table.go m t a fuel = some q := by
       simpa [accepting_table.go, hp', Option.bind_eq_some_iff] using hmap
-    apply GoesTo.head
+    apply GoesLeftOf.head
     · suffices m.nextConfig w.toWord ⟨p, Fin.last _⟩ ⟨p', Fin.ofNat _ w.length⟩ from this
       rw [←stepConfig_gives_nextConfig]
       unfold step at hp'
@@ -236,16 +295,17 @@ theorem table_for_accepting_go {m : TwoDFA α σ} (t : BackTable σ) (w : List �
     · trans
       · exact hind p' q' hq'
       · apply table_for_accepting_go (hmap := hmap') (hind := hind)
+    · rfl
 
 
 theorem accepts_of_table_for_accepting (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (hfor : t = m.table_for w) (hacc : m.accepting_table t) :
-    m.GoesTo w.toWord m.init ⟨m.accept, Fin.last _⟩ := by
+    m.GoesLeftOf w.toWord (Fin.last _) m.init ⟨m.accept, Fin.last _⟩ := by
   simp only [accepting_table, Option.bind_eq_bind, Option.bind_eq_some_iff] at hacc
   obtain ⟨init, hinit_some, hgo_accept⟩ := hacc
   have hfor' : t = m.table_for (List.take (↑(Fin.last w.length)) w) := by
     rwa [←List.take_length (l := w)] at hfor
   trans
-  · exact m.table_for_take_init w t (Fin.last (w.length)) hfor' hinit_some
+  · exact (m.table_for_take_init w t (Fin.last (w.length)) hfor' hinit_some).castSucc
   · apply table_for_accepting_go (hmap := hgo_accept)
     intros p q hpq
     have : w.length < w.length + 1 + 1 := by trans <;> apply Nat.lt_add_one
@@ -258,12 +318,21 @@ theorem accepts_of_table_for_accepting (m : TwoDFA α σ) (w : List α) (t : Bac
       simp only [Fin.ofNat_eq_cast, Fin.val_natCast, Nat.add_right_cancel_iff]
       rwa [Nat.mod_eq_of_lt]
     rw [this]; clear this
-    apply table_for_take_map
-    · rw [Fin.ne_iff_vne, Fin.val_ofNat, Fin.val_last]
-      simp [Nat.mod_eq_of_lt]
-    · rfl
-    · have : (Fin.ofNat (w.length + 2) w.length).val = (Fin.last w.length).val := by simpa
-      rwa [this, ←hfor']
+    let i := Fin.ofNat (w.length + 2) w.length
+    have i_val : i.val = w.length := by simpa [i]
+    have : m.GoesLeftOf w.toWord i { state := p, idx := i } { state := q, idx := i + 1 } := by
+      apply m.table_for_take_map w t
+      · rw [Fin.ne_iff_vne, Fin.val_ofNat, Fin.val_last]
+        simp [Nat.mod_eq_of_lt]
+      · simpa [i_val]
+      · assumption
+    apply this.castLE
+    rw [Fin.le_iff_val_le_val, Fin.val_add]
+    simp [i_val]
+
+theorem accepts_iff_table_for_accepting (m : TwoDFA α σ) (w : List α) : m.accepting_table (m.table_for w) ↔ m.GoesLeftOf w.toWord (Fin.last _) m.init ⟨m.accept, Fin.last _⟩ where
+  mp := m.accepts_of_table_for_accepting w _ rfl
+  mpr := sorry
 
 /----------------------------------------------------------------
                             The Goal
@@ -271,15 +340,14 @@ theorem accepts_of_table_for_accepting (m : TwoDFA α σ) (w : List α) (t : Bac
 theorem to_one_way_correct (m : TwoDFA α σ) : m.language = m.to_one_way.accepts := by
   ext w
   suffices m.accepts w.toWord ↔ m.accepting_table (m.table_for w) from this
+  rw [m.accepts_iff_table_for_accepting w]
   constructor
-  -- m.accepts w → m.table_for w is accepting
-  · intro hacc
-    have hacc := m.reaches_accept_last_of_accepts _ hacc
-    sorry
-  -- m.table_for w is accepting → m.accepts w
-  · intro hacc
+  · intro acc
+    apply GoesLeftOf.attach
+    exact m.reaches_accept_last_of_accepts w.toWord acc
+  · intro hgoes
     use Fin.last _
-    exact m.accepts_of_table_for_accepting w _ rfl hacc
+    exact hgoes.forget
 
 end Proof
 

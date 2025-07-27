@@ -110,35 +110,38 @@ theorem runOn_max_steps_of_reachable [Fintype σ] (cfg : Config σ n) (h : m.rea
         · exact Nat.lt_of_le_of_ne hle heq
         · exact runOn_steps_succ_eq_stp
 
+theorem accepts_of_runOn_max_eq_accept [Fintype σ] (i : Fin _) (h : m.runOn w (Fintype.card (Config σ n)) = ⟨m.accept, i⟩) : m.accepts w := by
+  use i
+  rw [←h]
+  apply reaches_runOn
+
 theorem accepts_iff_runOn_max_eq_accept [Fintype σ] : m.accepts w ↔ ∃ i, m.runOn w (Fintype.card (Config σ n)) = ⟨m.accept, i⟩ where
   mp := by
-    rintro ⟨pos, hreach⟩
+    intro hacc
+    have hreach := m.reaches_accept_last_of_accepts w hacc
     obtain ⟨steps, hsteps, hrun⟩ := runOn_max_steps_of_reachable (h := hreach)
     let remaining := Fintype.card (Config σ n) - steps
     have : steps + remaining = Fintype.card (Config σ n) := by simp [remaining, hsteps]
     rw [←this]; clear this
     use (m.runOn w (steps + remaining)).idx
     ext : 1 <;> simp only
-    apply m.accept_preserve_state w pos (m.runOn w (steps + remaining))
+    apply m.accept_preserve_state w _ (m.runOn w (steps + remaining))
     rw [←hrun]
     apply runOn_GoesTo
   mpr := by
-    rintro ⟨i, hrun⟩
-    use i
-    rw [←hrun]
-    apply reaches_runOn
+    rintro ⟨_, hrun⟩
+    apply accepts_of_runOn_max_eq_accept (h := hrun)
 
 theorem accepts_iff_execute_eq_accept [DecidableEq σ] [Fintype σ] : m.accepts w ↔ m.execute w = .accept := by
-  rw [execute_accept_iff_runOn_state_eq_accept, accepts_iff_runOn_max_eq_accept]
+  rw [execute_accept_iff_runOn_state_eq_accept]
   constructor
   -- m.accepts w → m.execute w = .accept
-  · rintro ⟨_, hrun⟩
+  · rw [accepts_iff_runOn_max_eq_accept]
+    rintro ⟨_, hrun⟩
     rw [hrun]
   -- m.execute w = .accept → m.accepts w
   · intro h
-    use (m.runOn w (Fintype.card (Config σ n))).idx
-    ext : 1
-    · exact h
-    · rfl
+    apply accepts_of_runOn_max_eq_accept
+    rw [←h]
 
 end TwoDFA
