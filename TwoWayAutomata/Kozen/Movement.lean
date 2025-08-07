@@ -3,6 +3,14 @@ import Mathlib.Algebra.Group.Fin.Basic
 import TwoWayAutomata.Kozen.Basics
 import TwoWayAutomata.Kozen.Word  -- TODO move utilities/extensions out to their own file, rather than in here
 
+theorem Movement.card_eq_2 : Fintype.card Movement = 2 := by
+  unfold Fintype.card
+  unfold Finset.univ
+  unfold Fintype.elems
+  unfold instFintypeMovement
+  unfold Movement.enumList
+  simp
+
 def Movement.opp : Movement → Movement
   | .left => .right
   | .right => .left

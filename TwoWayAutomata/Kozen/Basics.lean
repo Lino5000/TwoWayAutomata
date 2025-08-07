@@ -1,4 +1,5 @@
 import Mathlib.Data.Fintype.Fin
+import Mathlib.Tactic.DeriveFintype
 
 inductive TapeSymbol (α : Type _) : Type _ where
   | left : TapeSymbol α
@@ -11,6 +12,7 @@ instance {α : Type _} : Coe α (TapeSymbol α) where
 inductive Movement : Type where
   | left : Movement
   | right : Movement
+  deriving Fintype
 
 structure TwoDFA (α σ : Type*) : Type _ where
   step : TapeSymbol α → σ → σ × Movement

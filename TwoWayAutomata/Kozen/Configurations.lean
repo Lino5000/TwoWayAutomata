@@ -24,6 +24,7 @@ inductive nextConfig (c1 c2 : Config σ n) : Prop where
                 (happly : Movement.right.apply c1.idx hvalid = c2.idx) →
               nextConfig c1 c2
 
+
 theorem nextConfig.push_lt {c1 c2 : Config σ n} (a : α) (hnext : m.nextConfig x c1 c2) (hlt : c1.idx < Fin.last (n+1)) :
     m.nextConfig (x.push a) (c1.castLE <| by simp) (c2.castLE <| by simp) := by
   have get_same : x.get c1.idx = (x.push a).get (c1.castLE <| by simp).idx := by

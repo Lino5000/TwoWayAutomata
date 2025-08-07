@@ -108,6 +108,15 @@ theorem nextConfig.irrefl {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word
     contradiction
 
 @[simp]
+theorem nextConfig.must_move {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) (c1 c2 : Config σ n) (h : c1.idx = c2.idx) : ¬m.nextConfig w c1 c2 := by
+  rintro (⟨_, hvalid, hmv⟩ | ⟨_, _, hmv⟩)
+  all_goals simp [h, Movement.apply, ←Fin.val_inj] at hmv
+  -- Just a little more to do in the stepLeft case
+  suffices c2.idx.val - 1 ≠ c2.idx.val by contradiction
+  apply Nat.sub_one_ne_self
+  simpa [h] using hvalid.hleft
+
+@[simp]
 theorem nextConfig.halt_preserve_state {α σ : Type*} {n : Nat} {m : TwoDFA α σ} {w : Word α n} {c1 c2 : Config σ n}
   (hnext : m.nextConfig w c1 c2) (hlt : c1.state = m.accept ∨ c1.state = m.reject) :
     c2.state = c1.state := by
