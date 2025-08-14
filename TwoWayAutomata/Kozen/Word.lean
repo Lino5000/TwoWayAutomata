@@ -443,3 +443,24 @@ theorem split_2_idx_valid_of_internal {n : Nat} {i : Fin (n+2)} (h : i.internal)
 theorem Word.split_2_getElem {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (int : i.internal) :
     (w.split i int.left).2[0]'(split_2_idx_valid_of_internal int) = w.getInternal i int := by
   simp [Word.split, Word.getInternal, Fin.internal.val, Vector.get]
+
+@[simp]
+lemma Fin.internal.val_pred_lt {n : Nat} {i : Fin (n+1)} (int : i.succ.internal) : i.val < n := by
+  have := int.right
+  rw [←Fin.lt_last_iff_ne_last, Fin.lt_iff_val_lt_val] at this
+  simpa
+
+lemma List.toWord_val_getElem_eq_getElem {α : Type u} (w : List α) (i : Fin w.length) : w.toWord.val[i] = w[i.val] := by
+  have : w = w.toWord.val.toList := by simp [toWord]
+  conv =>
+    rhs; pattern w
+    rw [this]
+  simp
+
+theorem Word.toWord_get_internal {α : Type u} (w : List α) (i : Fin (w.length + 1)) (int : i.succ.internal) :
+    w.toWord.get i.succ = w[i.val]'(int.val_pred_lt) := by
+  apply w.toWord.getInternal_eq_get _ int |>.symm.trans
+  rw [w.toWord.getInternal_eq_getElem _ int, TapeSymbol.symbol.injEq, List.toWord_val_getElem_eq_getElem]
+  have : int.val.val = i.val := by simp [Fin.internal.val]
+  conv in int.val.val =>
+    rw [this]

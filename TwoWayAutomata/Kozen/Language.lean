@@ -321,15 +321,7 @@ theorem single_path {strt stp1 stp2 : Config σ n} (h1 : m.GoesTo x strt stp1) (
     | refl => right; exact hrest1.head hnext1
     | @head strt2 mid2 hnext2 hrest2 _ =>
       suffices mid1 = mid2 by apply ih1; rwa [this]
-      clear * - hnext1 hnext2
-      rcases hnext1, hnext2 with ⟨⟨hstep1, _, happly1⟩ | ⟨hstep1, _, happly1⟩, ⟨hstep2, _, happly2⟩ | ⟨hstep2, _, happly2⟩⟩
-      all_goals
-        have state_eq := hstep1.symm.trans hstep2
-        simp only [Prod.mk.injEq, reduceCtorEq, and_false, and_true] at state_eq
-        -- now the cases where hnext1 and hnext2 step in different directions have been resolved by contradiction
-      all_goals
-        have idx_eq := happly1.symm.trans happly2
-        ext : 1 <;> assumption
+      exact nextConfig_right_unique hnext1 hnext2
 
 theorem not_accept_and_reject : ¬ (m.reaches x ⟨m.accept, Fin.last _⟩ ∧ m.reaches x ⟨m.reject, Fin.last _⟩) := by
   by_contra h
