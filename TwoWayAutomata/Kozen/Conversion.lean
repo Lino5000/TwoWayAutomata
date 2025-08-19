@@ -1655,45 +1655,147 @@ theorem table_for_take_map (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (
       rw [(by simp : i.succ = i.castSucc + 1), ←hind] at hlnk
       use p', hnxt, hlnk
 
+theorem step_right_init_of_goes (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (i : Fin (w.length + 1)) (hi : i.val < w.length) (p q : σ) 
+  (ht : t = m.table_for (w.take i)) (hgo : m.GoesLeftOf w.toWord i.succ ⟨p, i.succ⟩ ⟨q, i.succ + 1⟩) :
+    m.step_right t w[i.val] p = some q := by
+  simp only [step_right, Option.map_eq_some_iff, Prod.exists, exists_and_right, exists_eq_right]
+  have ne_last : i ≠ Fin.last _ := by simpa [Fin.ne_iff_vne] using Nat.ne_of_lt hi
+  have hint : i.succ.internal := by simpa [Fin.internal]
+  rw [GoesLeftOf.step (hi := ne_last)] at hgo
+  obtain ⟨qs, hlen, hdup, hstrt, hend, hlinks⟩ := hgo
+  cases qs with
+  | nil => simp at hlen -- contradiction : 0 ≠ 0
+  | cons q' qs =>
+    rw [List.getElem_cons_zero] at hstrt
+    cases qs with
+    | nil =>
+      exists []
+      have hnext : m.nextConfig w ⟨p, i.succ⟩ ⟨q, i.succ + 1⟩ := by simpa [hstrt] using hend
+      unfold step_right.go
+      split
+      next p'' hstep => -- step right
+        suffices p'' = q by simpa
+        suffices m.nextConfig w ⟨p, i.succ⟩ ⟨p'', i.succ + 1⟩ by simpa using nextConfig_right_unique this hnext
+        right
+        · simpa [Word.toWord_get_internal (int := hint)] using hstep
+        · simp [Movement.apply, ←Fin.val_inj, Fin.val_add_one, hint.right]
+        · constructor <;> simp [hint.right]
+      next p'' hstep => -- step left
+        exfalso
+        suffices i.castSucc = i.succ + 1 by
+          have : i.val = i.val + 1 + 1 := by simpa [←Fin.val_inj, Fin.val_add_one, Nat.ne_of_lt hi]
+          omega
+        suffices m.nextConfig w ⟨p, i.succ⟩ ⟨p'', i.castSucc⟩ by apply And.right; simpa using nextConfig_right_unique this hnext
+        left
+        · simpa [Word.toWord_get_internal (int := hint)] using hstep
+        · simp [Movement.apply, ←Fin.val_inj]
+        · constructor <;> simp
+    | cons q'' qs =>
+      exists (q'' :: qs).reverse
+      obtain ⟨nxt, hnext, hlink⟩ := hlinks 0 (by simp)
+      simp only [hstrt, List.getElem_cons_zero] at hnext
+      unfold step_right.go
+      split
+      next p'' hstep => -- step right
+        exfalso
+        suffices i.castSucc = i.succ + 1 by
+          have : i.val = i.val + 1 + 1 := by simpa [←Fin.val_inj, Fin.val_add_one, Nat.ne_of_lt hi]
+          omega
+        suffices m.nextConfig w ⟨p, i.succ⟩ ⟨p'', i.succ + 1⟩ by apply And.right; simpa using nextConfig_right_unique hnext this
+        right
+        · simpa [Word.toWord_get_internal (int := hint)] using hstep
+        · simp [Movement.apply, ←Fin.val_inj, Fin.val_add_one, hint.right]
+        · constructor <;> simp [hint.right]
+      next p'' hstep => -- step left
+        simp only [List.not_mem_nil, ↓reduceDIte, Option.bind_eq_bind, Option.bind_eq_some_iff]
+        exists q''
+        constructor
+        · rw [m.table_for_take_map w t i.castSucc (by simp) ht]
+          suffices p'' = nxt by simpa [this] using hlink
+          suffices m.nextConfig w ⟨p, i.succ⟩ ⟨p'', i.castSucc⟩ by simpa using nextConfig_right_unique this hnext
+          left
+          · simpa [Word.toWord_get_internal (int := hint)] using hstep
+          · simp [Movement.apply, ←Fin.val_inj]
+          · constructor <;> simp
+        · apply m.step_right_go_from_parts hi _ _ _ _ _ hdup hend ?hlinks [] _ <| by exists qs.reverse; simp
+          -- Convert hlinks to use t.map rather than GoesLeftOf
+          intro j hj
+          obtain ⟨nxt, hnxt, hlnk⟩ := hlinks j hj
+          have hmap := m.table_for_take_map w t i.castSucc (by simp) ht
+          rw [(by simp : i.succ = i.castSucc + 1), ←hmap] at hlnk
+          use nxt, hnxt, hlnk
+
 theorem table_for_take_init (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (i : Fin (w.length + 1))
-  (ht : t = m.table_for (w.take i)) {q : σ} (hinit : t.init = some q)
-    : m.GoesLeftOf w.toWord i.castSucc m.init ⟨q, i.succ⟩ := by
+  (ht : t = m.table_for (w.take i)) {q : σ} :
+    t.init = some q ↔ m.GoesLeftOf w.toWord i.castSucc m.init ⟨q, i.succ⟩ := by
   induction i using Fin.inductionOn generalizing t q with
   | zero =>
-    conv at hinit =>
+    conv =>
+      lhs
       rw [ht]
       simp [table_for, first_table]
-    rw [←hinit]
-    apply GoesLeftOf.single (hlt := by rfl)
-    rw [←stepConfig_gives_nextConfig]
-    simp only [stepConfig, Word.get_eq_left_of_eq_zero, Fin.succ_zero_eq_one, Config.mk.injEq, true_and]
-    obtain ⟨_, hright⟩ := m.in_bounds_left m.start
-    unfold step at hright
-    conv => enter [1, 1, 1]; rw [hright]
-    simp [Movement.apply, Fin.castLT]
+    constructor
+    · intro hinit
+      rw [←hinit]
+      apply GoesLeftOf.single (hlt := by rfl)
+      rw [←stepConfig_gives_nextConfig]
+      simp only [stepConfig, Word.get_eq_left_of_eq_zero, Fin.succ_zero_eq_one, Config.mk.injEq, true_and]
+      obtain ⟨_, hright⟩ := m.in_bounds_left m.start
+      unfold step at hright
+      conv => enter [1, 1, 1]; rw [hright]
+      simp [Movement.apply, Fin.castLT]
+    · intro hgo
+      suffices m.stepConfig w.toWord m.init = ⟨q, 1⟩ by apply And.left; simpa [stepConfig, Word.get_eq_left_of_eq_zero]
+      rw [stepConfig_gives_nextConfig]
+      cases hgo with
+      | tail hlt hd tl =>
+        cases hd with
+        | refl => exact tl
+        | tail hlt' _ tl =>
+          exfalso
+          rw [Fin.castSucc_zero, Fin.le_zero_iff] at hlt hlt'
+          apply nextConfig.must_move _ _ _ _ (hlt'.trans hlt.symm) tl
   | succ i ih =>
     let prev_t := m.table_for (w.take i)
     have hstep : t = m.step_table prev_t w[i.val] := m.table_for_take_succ i prev_t t rfl ht
     have hinit_def : prev_t.init.bind (m.step_right prev_t w[i.val]) = t.init := by
       simp [hstep, step_table]
-    rw [hinit, Option.bind_eq_some_iff] at hinit_def
-    obtain ⟨prev_init, hprev, hstep_init⟩ := hinit_def
-    trans
-    · apply (ih prev_t rfl hprev).castSucc
-    · have : i.succ.succ = i.castSucc.succ + 1 := by
-        rw [←Fin.val_inj]
-        simp [Fin.val_add_one]
-      rw [this]
-      rw [step_right, Option.map_eq_some_iff] at hstep_init
-      obtain ⟨⟨q', qs⟩, hstep_init, hq'⟩ := hstep_init
-      simp only at hq'
-      apply m.table_for_step_right prev_t w i.castSucc i.is_lt prev_init q [] List.nodup_nil (qs := qs)
-      · simp [Fin.getElem_fin, hstep_init, hq']
-      · intro p q hmap
-        rwa [
-          m.table_for_take_map w _ i.castSucc.castSucc (by simp) (by unfold prev_t; rfl),
-          Fin.coeSucc_eq_succ
-        ] at hmap
+    rw [←Fin.succ_castSucc]
+    have hind : ∀ q, prev_t.init = some q ↔ _ := fun {q} ↦ ih prev_t rfl
+    have hsuccsucceq : i.succ.succ = i.castSucc.succ + 1 := by
+      rw [←Fin.val_inj]
+      simp [Fin.val_add_one]
+    rw [hsuccsucceq]
+    constructor
+    · intro hinit
+      rw [hinit, Option.bind_eq_some_iff] at hinit_def
+      obtain ⟨prev_init, hprev, hstep_init⟩ := hinit_def
+      trans
+      · apply GoesLeftOf.castSucc
+        rwa [hind] at hprev
+      · rw [step_right, Option.map_eq_some_iff] at hstep_init
+        obtain ⟨⟨q', qs⟩, hstep_init, hq'⟩ := hstep_init
+        simp only at hq'
+        apply m.table_for_step_right prev_t w i.castSucc i.is_lt prev_init q [] List.nodup_nil (qs := qs)
+        · simp [Fin.getElem_fin, hstep_init, hq']
+        · intro p q hmap
+          rwa [
+            m.table_for_take_map w _ i.castSucc.castSucc (by simp) (by unfold prev_t; rfl),
+            Fin.coeSucc_eq_succ
+          ] at hmap
+    · intro hgo
+      obtain ⟨⟨mid, mididx⟩, hgt, hpref, hrest⟩ := hgo.prefix_left_of i.castSucc.castSucc (by simp) (by simp) <| by
+        suffices i.val < i.val + 2 by simp [Fin.lt_iff_val_lt_val, Fin.val_add_one, this]
+        apply Nat.lt_add_of_pos_right
+        apply Nat.ofNat_pos
+      have : mididx = i.castSucc.succ := by simpa using hpref.stop_idx_of_gt hgt
+      rw [this] at hpref hrest; clear this hgt mididx
+      rw [←hind] at hpref
+      simp only [hstep, step_table, Option.bind_eq_bind, Option.bind_eq_some_iff]
+      exists mid
+      constructor
+      · exact hpref
+      · apply m.step_right_init_of_goes w prev_t i.castSucc (by simp) mid q rfl hrest
 
 theorem table_for_accepting_go {m : TwoDFA α σ} (t : BackTable σ) (w : List α) (p q : σ) (acc : List σ) (hdup : acc.Nodup) (hmap : accepting_table.go m t p acc hdup = some q)
   (hind : ∀ (p q : σ), t.map p = some q → m.GoesLeftOf w.toWord (Fin.last _) { state := p, idx := Fin.ofNat _ w.length } { state := q, idx := Fin.last _ }) :
@@ -1729,7 +1831,6 @@ theorem table_for_accepting_go {m : TwoDFA α σ} (t : BackTable σ) (w : List �
     rw [List.length_cons]
     omega
 
-
 theorem accepts_of_table_for_accepting (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (hfor : t = m.table_for w) (hacc : m.accepting_table t) :
     m.GoesLeftOf w.toWord (Fin.last _) m.init ⟨m.accept, Fin.last _⟩ := by
   simp only [accepting_table, Option.bind_eq_bind, Option.bind_eq_some_iff] at hacc
@@ -1737,7 +1838,8 @@ theorem accepts_of_table_for_accepting (m : TwoDFA α σ) (w : List α) (t : Bac
   have hfor' : t = m.table_for (List.take (↑(Fin.last w.length)) w) := by
     rwa [←List.take_length (l := w)] at hfor
   trans
-  · exact (m.table_for_take_init w t (Fin.last (w.length)) hfor' hinit_some).castSucc
+  · rw [m.table_for_take_init w t (Fin.last (w.length)) hfor'] at hinit_some
+    exact hinit_some.castSucc
   · apply table_for_accepting_go (hmap := hgo_accept)
     intros p q hpq
     have : w.length < w.length + 1 + 1 := by trans <;> apply Nat.lt_add_one
@@ -1762,10 +1864,131 @@ theorem accepts_of_table_for_accepting (m : TwoDFA α σ) (w : List α) (t : Bac
     rw [Fin.le_iff_val_le_val, Fin.val_add]
     simp [i_val]
 
+theorem accepting_table_go_of_goes {m : TwoDFA α σ} {w : List α} {t : BackTable σ} (hfor : t = m.table_for (w.take (Fin.last w.length)))
+  {p : σ} (hgoes : m.GoesLeftOf w.toWord (Fin.last _) ⟨p, Fin.last _⟩ ⟨m.accept, Fin.last _⟩) (acc : List σ) (hdup : acc.Nodup)
+  (hacc : ∀ q ∈ acc, m.GoesLeftOf w.toWord (Fin.last _) ⟨q, Fin.last _⟩ ⟨p, Fin.last _⟩) :
+    accepting_table.go m t p acc hdup = some m.accept := by
+  unfold accepting_table.go
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
+  rcases hgoes.as_head with heq | hnext | ⟨nxt, hd, tl⟩
+  · exists m.accept
+    have heq : p = m.accept := by simpa using heq
+    constructor
+    · obtain ⟨⟨mv, hstep⟩, _⟩ := m.halt_preserve_state .right
+      simp only [heq, hstep]
+      have := m.table_for_take_map w t (Fin.last _).castSucc (by simp) hfor
+      rw [this]
+      apply GoesLeftOf.single
+      · simp
+      · rw [←stepConfig_gives_nextConfig]
+        suffices m.step (w.toWord.get (Fin.last _).castSucc) m.accept = (m.accept, .right) by
+          simp only [stepConfig, this, Fin.coeSucc_eq_succ, Fin.succ_last, Nat.succ_eq_add_one, Config.mk.injEq, true_and]
+          simp [Movement.apply, ←Fin.val_inj]
+        if hw : w = []
+          then
+            obtain ⟨⟨mv, h1⟩, _⟩ := m.halt_preserve_state (w.toWord.get (Fin.last _).castSucc)
+            simp only [Fin.castSucc_eq_zero_iff, Fin.last_eq_zero_iff, hw, List.length_nil, Word.get_eq_left_of_eq_zero] at h1
+            obtain ⟨u, h2⟩ := m.in_bounds_left m.accept
+            have : u = m.accept := by symm; apply And.left; simpa [h1] using h2
+            simpa [Word.get_eq_left_of_eq_zero, hw, this] using h2
+          else
+            have := m.halt_move_right (w.toWord.getInternal (Fin.last _).castSucc <| by simp [Fin.internal, hw]) |>.left
+            simpa [Word.getInternal_eq_get]
+    · if hmem : m.accept ∈ acc
+        then simp [hmem]
+        else
+          simp only [hmem, ↓reduceDIte]
+          apply accepting_table_go_of_goes hfor
+          · apply GoesLeftOf.refl; simp
+          · intro q hmem
+            rw [List.mem_cons] at hmem
+            cases hmem with
+            | inl heq => rw [heq]; apply GoesLeftOf.refl; simp
+            | inr hmem => exact (hacc q hmem).trans hgoes
+  · cases hnext with
+    | stepLeft _ _ happly =>
+      simp [Movement.apply, ←Fin.val_inj] at happly -- contradiction : w.length = w.length + 1
+    | stepRight _ hvalid _ =>
+      have := hvalid.hright
+      simp at this -- stepping right is invalid
+  · cases hd with
+    | stepRight _ hvalid _ =>
+      have := hvalid.hright
+      simp at this -- stepping right is invalid
+    | stepLeft hstep _ happly =>
+      have hd : m.nextConfig w ⟨p, Fin.last _⟩ nxt := by left <;> assumption
+      have nxt_def : nxt = ⟨nxt.state, (Fin.last _).castSucc⟩ := by
+        suffices (Fin.last _).castSucc = nxt.idx by ext <;> simp [this]
+        simpa [Movement.apply, ←Fin.val_inj] using happly
+      rw [nxt_def] at tl
+      obtain ⟨⟨mid, mididx⟩, hgt, hpref, hrest⟩ := tl.prefix_left_of (Fin.last _).castSucc (by simp) (by simp) (by simp)
+      have hmideq : mididx = Fin.last _ := by simpa using hpref.stop_idx_of_gt hgt
+      rw [hmideq] at hrest
+      exists mid
+      constructor
+      · simp only [Word.get_eq_right_of_eq_last] at hstep
+        simp only [hstep]
+        have := m.table_for_take_map w t (Fin.last _).castSucc (by simp) hfor
+        rw [this]
+        simpa [hmideq] using hpref
+      · if hmem : mid ∈ acc
+          then
+            simp only [hmem, ↓reduceDIte, Option.some.injEq]
+            rw [nxt_def] at hd
+            have hcyc : m.CyclesLeftOf w.toWord (Fin.last _) ⟨p, Fin.last _⟩ := by
+              constructor
+              · simp
+              · exists nxt
+                rw [nxt_def]
+                constructor
+                · exact hd
+                · apply hpref.castSucc.trans
+                  simpa [hmideq] using hacc mid hmem
+            have hcyc := hcyc.transfer <| hpref.castSucc.head hd <| by simp
+            apply m.accept_preserve_state w.toWord (Fin.last _) ⟨mid, mididx⟩
+            apply GoesLeftOf.forget
+            apply hcyc.split
+            rwa [hmideq] -- uses hrest
+          else
+            simp only [hmem, ↓reduceDIte]
+            apply accepting_table_go_of_goes hfor
+            · have : mididx = _ := hpref.stop_idx_of_gt hgt
+              simpa [this] using hrest
+            · intro q hmem
+              rw [List.mem_cons] at hmem
+              cases hmem with
+              | inl heq => rw [heq]; apply GoesLeftOf.refl; simp
+              | inr hmem => 
+                apply (hacc q hmem).trans 
+                rw [hmideq] at hpref
+                rw [nxt_def] at hd
+                apply hpref.castSucc.head hd
+                simp
+  termination_by Fintype.card σ - acc.length
+  decreasing_by 
+    all_goals
+      have := (hdup.cons hmem).length_le_card
+      rw [List.length_cons] at this
+      rw [List.length_cons]
+      omega
+
 theorem table_for_accepting_of_accepts (m : TwoDFA α σ) (w : List α) (t : BackTable σ) (hfor : t = m.table_for w)
   (hacc : m.GoesLeftOf w.toWord (Fin.last _) m.init ⟨m.accept, Fin.last _⟩) :
     m.accepting_table t := by
-  sorry
+  have hfor' : t = m.table_for (List.take (↑(Fin.last w.length)) w) := by
+    rwa [←List.take_length (l := w)] at hfor
+  simp only [accepting_table, Option.bind_eq_bind, Option.bind_eq_some_iff]
+  obtain ⟨⟨init, initidx⟩, hgt, hreach, hchase⟩ := hacc.prefix_left_of (Fin.last w.length).castSucc (by simp) (by simp) (by simp)
+  have hinit : initidx = _ := hreach.stop_idx_of_gt hgt
+  rw [hinit] at hreach hchase
+  clear initidx hinit hgt
+  exists init
+  constructor
+  · rw [m.table_for_take_init w t _ hfor']
+    simpa using hreach
+  · apply accepting_table_go_of_goes hfor'
+    · simpa using hchase
+    · intro; simp -- accumulator property is vacuously true
 
 theorem accepts_iff_table_for_accepting (m : TwoDFA α σ) (w : List α) : m.accepting_table (m.table_for w) ↔ m.GoesLeftOf w.toWord (Fin.last _) m.init ⟨m.accept, Fin.last _⟩ where
   mp := m.accepts_of_table_for_accepting w _ rfl
