@@ -8,54 +8,31 @@ def exampleLanguage : Language (Fin 2) := { x | allOnes x}
 
 inductive ExampleState : Type where
   | q : ExampleState
-  | t : ExampleState
-  | r : ExampleState
   deriving Fintype
 
-def exampleStep (a : TapeSymbol (Fin 2)) (s : ExampleState) : ExampleState × Movement :=
+def exampleStep (a : TapeSymbol (Fin 2)) (s : ExampleState) : State ExampleState × Movement :=
   match s, a with
-  | .t, .right => (.t, .left)
-  | .t, _ => (.t, Movement.right)
-  | .r, .right => (.r, .left)
-  | .r, _ => (.r, .right)
-  | .q, .right => (.t, .left)
-  | .q, .symbol 0 => (.q, .left)
-  | .q, _ => (.q, .right)
+  | .q, .right => (.accept, .left)
+  | .q, .symbol 0 => (.other .q, .left)
+  | .q, _ => (.other .q, .right)
 
 /-- A 2DFA that recognises strings consisting of entirely 1's, diverging on any string that contains a 0 -/
 def example2DFA : TwoDFA (Fin 2) ExampleState where
   start := .q
-  accept := .t
-  reject := .r
-  distinct_tr := by simp
-  step := exampleStep
-  in_bounds_left := by
-    intro s
-    use s
-    cases s <;> simp [exampleStep]
-  in_bounds_right := by
-    intro s
-    cases h : s with
-    | t | r => use s; simp [h, exampleStep]
-    | q => use .t; simp [exampleStep]
-  halt_move_right := by simp [exampleStep]
-  halt_preserve_state := by
-    intro a
-    cases a
-    case' right => let m := Movement.left
-    case' left | symbol => let m := Movement.right
-    all_goals constructor
-    all_goals use m; simp [exampleStep, m]
+  stepOther := exampleStep
+  stay_in_bounds p := by
+    cases p
+    simp [exampleStep]
 
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
   atLeft 
-    | .q, _ => True
-    | .t, w => w.all (· == 1)
-    | .r, w => w.any (· != 1)
+    | .other .q, _ => True
+    | .accept, w => w.all (· == 1)
+    | .reject, w => w.any (· != 1)
   inWord
-    | .q, _ => fun ⟨wl, _⟩ ↦ wl.all (· == 1)
-    | .t, _ => fun ⟨wl, wr⟩ ↦ (wl ++ wr).all (· == 1)
-    | .r, _ => fun ⟨wl, wr⟩ ↦ (wl ++ wr).any (· != 1)
+    | .other .q, _ => fun ⟨wl, _⟩ ↦ wl.all (· == 1)
+    | .accept, _ => fun ⟨wl, wr⟩ ↦ (wl ++ wr).all (· == 1)
+    | .reject, _ => fun ⟨wl, wr⟩ ↦ (wl ++ wr).any (· != 1)
 
 theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) example2DFA where
   base := by simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, example2DFA]
@@ -63,7 +40,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
     rintro w ⟨s, i⟩ hind
     let get_res := w.get i
     match hs : s, hget : get_res with
-    | .t, .left | .r, .left =>
+    | .accept, .left | .reject, .left =>
       have hleft : i = 0 := w.eq_zero_of_get_eq_left hget
       rw [hleft]; rw [hleft] at hind
       conv at hget => unfold get_res; rw [hleft]
@@ -76,7 +53,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
       simp only [SplitPredicate.apply, Word.split_append, Vector.all_cast, Vector.any_cast]
       exact hind
-    | .t, .right | .r, .right | .q, .right =>
+    | .accept, .right | .reject, .right | .other .q, .right =>
       have hright : i = Fin.last _ := w.eq_last_of_get_eq_right hget
       rw [hright]; rw [hright] at hind
       conv at hget => unfold get_res; rw [hright]
@@ -99,7 +76,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           simp only [TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
           simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
           exact hind
-    | .t, .symbol a | .r, .symbol a =>
+    | .accept, .symbol a | .reject, .symbol a =>
       unfold get_res at hget
       have hint : i.internal := w.internal_of_get_eq_symbol ⟨a, hget⟩
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
@@ -114,7 +91,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       simp only [TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
       simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
       exact hind
-    | .q, .left =>
+    | .other .q, .left =>
       have hleft : i = 0 := w.eq_zero_of_get_eq_left hget
       rw [hleft]; rw [hleft] at hind
       conv at hget => unfold get_res; rw [hleft]
@@ -126,7 +103,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
         simp only [SplitPredicate.apply, Word.split_append]
       simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
       simp [SplitPredicate.apply, Word.split_one]
-    | .q, .symbol 0 =>
+    | .other .q, .symbol 0 =>
       unfold get_res at hget
       have hint : i.internal := w.internal_of_get_eq_symbol ⟨_, hget⟩
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
@@ -149,7 +126,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
             rw [w.split_pred _ this]
             simp only [Vector.all_cast, Vector.all_push, Bool.and_eq_true]
           exact hind.left
-    | .q, .symbol 1 =>
+    | .other .q, .symbol 1 =>
       unfold get_res at hget
       have hint : i.internal := w.internal_of_get_eq_symbol ⟨_, hget⟩
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
@@ -175,9 +152,7 @@ def cfg_encoding : TwoDFA.WellFoundedEncoding ExampleState where
     rel := LT.lt,
     wf := IsWellFounded.wf
   }
-  encode 
-  | ⟨.q, pos⟩ => pos
-  | _ => 0
+  encode c := c.snd
 
 lemma get_eq_one_of_allOnes (w : List (Fin 2)) (h : allOnes w) {i : Fin (w.length)} : w.get i = 1 := by
   conv at h =>
@@ -197,37 +172,24 @@ lemma eq_one_of_allOnes_of_get_eq_symbol {w : List (Fin 2)} {p : Fin (w.length +
 theorem example_halts_of_allOnes {w : List (Fin 2)} (h : allOnes w) : ¬example2DFA.diverges w.toWord := by
   apply TwoDFA.halts_of_next_except_halt_WF
   apply TwoDFA.next_except_halt_WF_of_encoding _ cfg_encoding
-  rintro c1 c2 ⟨hna, hnr, hnext⟩
-  match c1, c2 with
-  | ⟨.t, p⟩, ⟨.q, _⟩ | ⟨.r, p⟩, ⟨.q, _⟩ =>
-    exfalso
-    have := hnext.halt_preserve_state <| by simp [example2DFA]
-    simpa
-  | ⟨.q, p1⟩, ⟨.q, p2⟩ =>
-    clear hna hnr
-    simp only [cfg_encoding, TwoDFA.WellFoundedEncoding.rel]
-    simp only [example2DFA, ← TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, TwoDFA.Config.mk.injEq] at hnext
-    obtain ⟨hstate, hpos⟩ := hnext
-    cases hget : w.toWord.get p1 with
-    | right => simp [hget, exampleStep] at hstate  -- Contradiction; .q at .right always steps to .t, not .q
-    | left =>
-      conv at hpos =>
-        pattern exampleStep _ _
-        rw [hget]
-        simp only [exampleStep]
-      rw [←hpos]
-      apply Movement.lt_apply_right
-    | symbol a =>
-      have hget : w.toWord.get p1 = .symbol 1 := eq_one_of_allOnes_of_get_eq_symbol h hget
-      conv at hpos =>
-        pattern exampleStep _ _
-        rw [hget]
-        simp only [exampleStep]
-      rw [←hpos]
-      apply Movement.lt_apply_right
+  rintro ⟨q⟩ p1 ⟨q⟩ p2 ⟨_, _, hnext⟩
+  simp only [cfg_encoding, TwoDFA.WellFoundedEncoding.rel]
+  simp only [example2DFA, ← TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, TwoDFA.Config.mk.injEq] at hnext
+  obtain ⟨hstate, hpos⟩ := hnext
+  cases hget : w.toWord.get p1 with
+  | right => simp [hget, exampleStep] at hstate  -- Contradiction; .q at .right always steps to .t, not .q
+  | left =>
+    simp only [exampleStep, hget] at hpos
+    unfold Movement.apply at hpos
+    simp [←hpos, Fin.lt_iff_val_lt_val]
+  | symbol a =>
+    have hget : w.toWord.get p1 = .symbol 1 := eq_one_of_allOnes_of_get_eq_symbol h hget
+    simp only [exampleStep, hget] at hpos
+    unfold Movement.apply at hpos
+    simp [←hpos, Fin.lt_iff_val_lt_val]
 
 theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
-  apply example2DFA.language_eq_of_inductive _ _ exampleCMInductive
+  apply example2DFA.language_eq_of_inductive (hind := exampleCMInductive)
   case hacc | hrej =>
     intro w h
     unfold exampleLanguage
@@ -236,7 +198,7 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
     conv at h =>
       simp only [example2DFA, exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
       simp only [SplitPredicate.apply, Word.split_append, Vector.all_cast, Vector.any_cast]
-    simpa [List.toWord] using h
+    simpa using h
   case hdiv =>
     intro w hdiv h
     conv at h =>

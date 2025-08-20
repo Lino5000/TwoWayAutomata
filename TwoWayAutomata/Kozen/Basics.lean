@@ -14,60 +14,76 @@ inductive Movement : Type where
   | right : Movement
   deriving Fintype
 
+inductive State (σ : Type _) : Type _ where
+  | accept : State σ
+  | reject : State σ
+  | other : σ → State σ
+  deriving DecidableEq, Fintype
+
+instance {σ : Type _} : Coe σ (State σ) where
+  coe := State.other
+
 structure TwoDFA (α σ : Type*) : Type _ where
-  step : TapeSymbol α → σ → σ × Movement
+  stepOther : TapeSymbol α → σ → (State σ) × Movement
   start : σ
-  accept : σ
-  reject : σ
-  distinct_tr : accept ≠ reject
-  in_bounds_left : ∀ q : σ, ∃ u : σ, step TapeSymbol.left q = (u, Movement.right)
-  in_bounds_right : ∀ q : σ, ∃ u : σ, step TapeSymbol.right q = (u, Movement.left)
-  halt_move_right : ∀ a : α, step a accept = (accept, Movement.right) ∧ step a reject = (reject, Movement.right)
-  halt_preserve_state : ∀ a : TapeSymbol α, (∃ m : Movement, step a accept = (accept, m)) ∧ (∃ m : Movement, step a reject = (reject, m))
+  stay_in_bounds : ∀ p, (∃ q, stepOther .left p = (q, .right)) ∧ (∃ q, stepOther .right p = (q, .left))
+
+abbrev TwoDFA.step {α σ : Type*} (m : TwoDFA α σ) : TapeSymbol α → State σ → (State σ) × Movement
+  | .right, .accept => (.accept, .left)
+  | _, .accept => (.accept, .right)
+  | .right, .reject => (.reject, .left)
+  | _, .reject => (.reject, .right)
+  | a, .other q => m.stepOther a q
+
+theorem TwoDFA.in_bounds_left {α σ : Type*} (m : TwoDFA α σ) (p : State σ) :
+    ∃ q, m.step .left p = (q, .right) := by
+  cases p with
+  | accept | reject => simp [step]
+  | other p => 
+    simp only [step]
+    exact m.stay_in_bounds p |>.left
+
+theorem TwoDFA.in_bounds_right {α σ : Type*} (m : TwoDFA α σ) (p : State σ) :
+    ∃ q, m.step .right p = (q, .left) := by
+  cases p with
+  | accept | reject => simp [step]
+  | other p => 
+    simp only [step]
+    exact m.stay_in_bounds p |>.right
+
+theorem TwoDFA.halt_preserve_state {α σ : Type*} (m : TwoDFA α σ) (a : TapeSymbol α) :
+    (∃ mv, m.step a .accept = (.accept, mv)) ∧ (∃ mv, m.step a .reject = (.reject, mv)) := by
+  cases a <;> simp
+
+theorem TwoDFA.halt_move_right {α σ : Type*} (m : TwoDFA α σ) (a : TapeSymbol α) (h : a ≠ .right) :
+    m.step a .accept = (.accept, .right) ∧ m.step a .reject = (.reject, .right) := by
+  cases a with
+  | right => contradiction
+  | left | symbol => simp
 
 @[ext]
 structure TwoDFA.Config (σ : Type _) (n : Nat) where
-  state : σ
+  state : State σ
   idx : Fin (n + 2)
-
-deriving instance DecidableEq for TwoDFA.Config
-
-instance (n : Nat) (σ : Type _) [fin_states : Fintype σ] : Fintype (TwoDFA.Config σ n) where
-  elems := by
-    let f (x : Fin (n+2) × σ) : TwoDFA.Config σ n := ⟨x.2, x.1⟩
-    constructor; swap
-    · exact ((Fin.fintype (n+2)).elems.product fin_states.elems).val.map f
-    · apply Multiset.Nodup.map_on
-      · intro _ _ _ _ hf
-        simp only [TwoDFA.Config.mk.injEq, f] at hf
-        ext <;> simp [hf]
-      · apply Multiset.Nodup.product <;> exact Fintype.elems.nodup
-  complete := by
-    rintro ⟨q, i⟩
-    simp only [Finset.mem_def, Multiset.mem_map]
-    use (i, q)
-    simp only [and_true]
-    suffices (i, q) ∈ Fintype.elems.val.product Fintype.elems.val by
-      rwa [Finset.product_eq_sprod, Finset.product_val]
-    simp only [Multiset.mem_product, Finset.mem_val]
-    constructor <;> apply Fintype.complete
+  deriving DecidableEq, Fintype
 
 structure Word (α : Type _) (n : Nat) : Type _ where
   val : Vector α n
 
-section Word
+@[reducible]
+def List.toWord {α : Type _} (l : List α) : Word α (l.length) :=
+  ⟨ l.toArray.toVector ⟩
+
+namespace Word
 
 variable {α : Type _}
 
-def Word.empty : Word α 0 := ⟨#[].toVector⟩
-
-def List.toWord (l : List α) : Word α (l.length) :=
-  ⟨ l.toArray.toVector ⟩
+def empty : Word α 0 := ⟨#[].toVector⟩
 
 instance (x : List α) : CoeDep (List α) x (Word α (x.length)) where
   coe := x.toWord
 
-def Word.get {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbol α :=
+def get {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbol α :=
   if h : i = 0
     then .left
     else
@@ -78,11 +94,11 @@ def Word.get {n : Nat} (w : Word α n) (i : Fin (n+2)) : TapeSymbol α :=
           let ltN := Fin.val_lt_last h
           w.val.get <| k.castLT ltN
 
-abbrev Word.split_type (α : Type _) {n : Nat} (i : Fin (n+2)) (h : i ≠ 0) : Type _ := 
+abbrev split_type (α : Type _) {n : Nat} (i : Fin (n+2)) (h : i ≠ 0) : Type _ := 
   (Vector α (min (i.pred h) n) × Vector α (n - (i.pred h)))
 
 --- Split the word before symbol i. Note that we can't split with i=0, since that would be trying to split before the left endmarker
-def Word.split {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_type α i h :=
+def split {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_type α i h :=
   let last := i.pred h
   (Vector.cast (by simp [h, last]) <| w.val.take last, Vector.cast (by simp [h, last]) <| w.val.drop last)
 

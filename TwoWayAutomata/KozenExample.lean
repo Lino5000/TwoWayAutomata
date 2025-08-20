@@ -27,8 +27,6 @@ section example2DFA
 inductive ExampleState : Type where
   | q : Fin 3 → ExampleState
   | p : Fin 2 → ExampleState
-  | t : ExampleState
-  | r : ExampleState
   deriving Fintype
 
 theorem fin2_lt_2 (j : Fin 2) : j = 0 ∨ j = 1 := by
@@ -45,62 +43,38 @@ theorem fin3_lt_3 (j : Fin 3) : j = 0 ∨ j = 1 ∨ j = 2 := by
   have := Nat.eq_zero_of_le_zero <| by simpa using h
   simp [this]
 
-def exampleStep (a : TapeSymbol <| Fin 2) (s : ExampleState) : ExampleState × Movement :=
+def exampleStep (a : TapeSymbol <| Fin 2) (s : ExampleState) : State ExampleState × Movement :=
   match s, a with
-  | .t, .right => (ExampleState.t, Movement.left)
-  | .t, _ => (ExampleState.t, Movement.right)
-  | .r, .right => (ExampleState.r, Movement.left)
-  | .r, _ => (ExampleState.r, Movement.right)
   | .q i, .symbol 0 => (ExampleState.q (i+1), Movement.right)
   | .q 0, .right => (ExampleState.p 0, Movement.left)
-  | .q _, .right => (ExampleState.r, Movement.left)
+  | .q _, .right => (.reject, Movement.left)
   | .q i, _ => (ExampleState.q i, Movement.right)
   | .p j, .symbol 1 => (ExampleState.p (j+1), Movement.left)
-  | .p 0, .left => (ExampleState.t, Movement.right)
-  | .p 1, .left => (ExampleState.r, Movement.right)
+  | .p 0, .left => (.accept, Movement.right)
+  | .p 1, .left => (.reject, Movement.right)
   | .p j, _ => (ExampleState.p j, Movement.left)
 
 /-- A 2DFA which identifies strings of {0, 1} where the number of 0s is divisible by 3 and the number of 1s is divisible by 2 -/
 def example2DFA : TwoDFA (Fin 2) ExampleState where
   start := ExampleState.q 0
-  accept := ExampleState.t
-  reject := ExampleState.r
-  distinct_tr := by simp only [ne_eq, reduceCtorEq, not_false_eq_true]
-  step := exampleStep
-  in_bounds_left := by
-    intro q
-    cases q with
-    | p j =>
-      rcases fin2_lt_2 j with hj | hj
-      <;> simp [hj, exampleStep]
-    | _ => simp [exampleStep]
-  in_bounds_right := by
-    intro q
-    cases q with
-    | q j =>
-      rcases fin3_lt_3 j with hj | hj | hj
-      <;> simp [hj, exampleStep]
-    | _ => simp [exampleStep]
-  halt_move_right := by
-    intro a
-    simp only [exampleStep, and_self]
-  halt_preserve_state := by
-    intro a
-    cases a with
-    | right => constructor <;> exists Movement.left
-    | _ => constructor <;> exists Movement.right
+  stepOther := exampleStep
+  stay_in_bounds p := by
+    cases p
+    case' p j => rcases fin2_lt_2 j with hj | hj
+    case' q j => rcases fin3_lt_3 j with hj | hj | hj
+    all_goals simp [hj, exampleStep]
 
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
   atLeft
-    | .p j, word => (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = ↑j
-    | .q j, _    => 0 = ↑j
-    | .t  , word => (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = 0
-    | .r  , word => (word.count 0) % 3 ≠ 0 ∨ (word.count 1) % 2 = 1
+    | .other (.p j), word => (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = ↑j
+    | .other (.q j), _    => 0 = ↑j
+    | .accept      , word => (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = 0
+    | .reject      , word => (word.count 0) % 3 ≠ 0 ∨ (word.count 1) % 2 = 1
   inWord
-    | .q j, _ => fun ⟨wleft, _⟩ ↦ wleft.count 0 % 3 = ↑j
-    | .p j, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ wright.tail.count 1 % 2 = ↑j
-    | .t  , _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0
-    | .r  , _ => fun ⟨wleft, wright⟩ ↦ ¬((wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0)
+    | .other (.q j), _ => fun ⟨wleft, _⟩ ↦ wleft.count 0 % 3 = ↑j
+    | .other (.p j), _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ wright.tail.count 1 % 2 = ↑j
+    | .accept      , _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0
+    | .reject      , _ => fun ⟨wleft, wright⟩ ↦ ¬((wleft ++ wright).count 0 % 3 = 0 ∧ (wleft ++ wright).count 1 % 2 = 0)
 
 
 theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) example2DFA where
@@ -109,8 +83,8 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
     rintro w ⟨state, idx⟩ hind
     let get_res := w.get idx
     match hstate : state, hget : get_res with
-    | .t, .left | .t, .symbol a
-    | .r, .left | .r, .symbol a =>
+    | .accept, .left | .accept, .symbol a
+    | .reject, .left | .reject, .symbol a =>
       unfold get_res at hget
       conv in example2DFA.stepConfig _ _ =>
         simp only [TwoDFA.stepConfig, example2DFA, exampleStep, hget]
@@ -125,7 +99,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       if h : idx = 0
         then simpa [h, or_iff_not_and_not] using hind
         else simpa [h, or_iff_not_and_not] using hind
-    | .t, .right =>
+    | .accept, .right =>
       unfold get_res at hget
       conv in example2DFA.stepConfig _ _ =>
         simp only [TwoDFA.stepConfig, example2DFA, exampleStep, hget]
@@ -151,7 +125,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, move_left, ↓reduceDIte]
           simp only [SplitPredicate.apply]
           rwa [Word.split_append, Vector.count_cast, Vector.count_cast]
-    | .r, .right =>
+    | .reject, .right =>
       unfold get_res at hget
       have last_idx := Word.eq_last_of_get_eq_right hget
       have idx_ne_zero : idx ≠ 0 := by simp [last_idx, ←Fin.val_inj]
@@ -179,7 +153,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, move_left, ↓reduceDIte]
           simp only [SplitPredicate.apply]
           rwa [Word.split_append, Vector.count_cast, Vector.count_cast]
-    | .q j, .left =>
+    | .other (.q j), .left =>
       unfold get_res at hget
       have idx_zero : idx = 0 := Word.eq_zero_of_get_eq_left hget
       rw [idx_zero]
@@ -196,7 +170,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       have : (w.split (Movement.right.apply 0 right_valid) (by simp [right_apply])).1 = ⟨#[], by simp [sizes_eq]⟩ := by
         simp [right_apply]
       simp [this, right_apply, SplitPredicate.apply, ←hind]
-    | .p j, .left => cases fin2_lt_2 j; all_goals
+    | .other (.p j), .left => cases fin2_lt_2 j; all_goals
       rename j = _ => hj
       unfold get_res at hget
       have idx_zero : idx = 0 := Word.eq_zero_of_get_eq_left hget
@@ -212,7 +186,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
         exampleStep, right_apply, Fin.one_eq_zero_iff, Nat.reduceEqDiff, ↓reduceDIte,
         exampleConfigMeaning, SplitPredicate.apply, Word.split_append, Vector.count_cast, Vector.count_cast]
       simp [hind]
-    | .q j, .right =>
+    | .other (.q j), .right =>
       cases fin3_lt_3 j; case' inr => rename j = _ ∨ _ => hj'; cases hj'
       all_goals
         rename j = _ => hj
@@ -261,7 +235,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           simp only [SplitPredicate.apply]
           rw [Word.split_append, Vector.count_cast]
           simp [hind]
-    | .p j, .right =>
+    | .other (.p j), .right =>
       unfold get_res at hget
       have idx_last := Word.eq_last_of_get_eq_right hget
       rw [idx_last]
@@ -305,7 +279,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
             simp [←this, h']
           rw [split_n_tail_empty]
           simp [hind]
-    | .q j, .symbol a =>
+    | .other (.q j), .symbol a =>
       cases fin3_lt_3 j; case' inr => rename j = _ ∨ _ => hj'; cases hj'
       all_goals
         rename j = _ => hj
@@ -335,7 +309,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
             exact idx_int.right
           rw [Nat.add_mod, hind, this]
           simp [ha]
-    | .p j, .symbol a =>
+    | .other (.p j), .symbol a =>
       cases fin2_lt_2 j; all_goals
         rename j = _ => hj
         unfold get_res at hget
@@ -423,9 +397,8 @@ def cfg_encoding : TwoDFA.WellFoundedEncoding ExampleState where
   encode
   | ⟨.q _, pos⟩ => (0, pos)
   | ⟨.p _, pos⟩ => (1, pos.rev)
-  | ⟨.t, _⟩ | ⟨.r, _⟩ => (2, 0)
 
-lemma example_never_p_to_q {n : Nat} {w : Word (Fin 2) n} : ∀ i, ∀ j, ∀ p1 p2, ¬ example2DFA.nextConfig w ⟨.p i, p1⟩ ⟨.q j, p2⟩
+lemma example_never_p_to_q {n : Nat} {w : Word (Fin 2) n} : ∀ i, ∀ j, ∀ p1 p2, ¬ example2DFA.nextConfig w ⟨.other (.p i), p1⟩ ⟨.other (.q j), p2⟩
   | i, j, p1, p2 => by
     simp only [example2DFA, Fin.isValue, ← TwoDFA.stepConfig_gives_nextConfig,
       TwoDFA.stepConfig, TwoDFA.Config.mk.injEq, not_and]
@@ -437,7 +410,7 @@ lemma example_never_p_to_q {n : Nat} {w : Word (Fin 2) n} : ∀ i, ∀ j, ∀ p1
       | left | right => simp [h, exampleStep]
       | symbol a => rcases fin2_lt_2 a with ha | ha <;> simp [ha, exampleStep]
 
-lemma example_q_to_q_right {j1 j2 : Fin 3} {a : TapeSymbol (Fin 2)} (h : (exampleStep a (.q j1)).1 = .q j2) : (exampleStep a (.q j1)).2 = .right := by
+lemma example_q_to_q_right {j1 j2 : Fin 3} {a : TapeSymbol (Fin 2)} (h : (exampleStep a (.q j1)).1 = .other (.q j2)) : (exampleStep a (.q j1)).2 = .right := by
   rcases a with left | right | a
   case' symbol => -- Split the symbol case by what the symbol is
     rcases fin2_lt_2 a with ha | ha
@@ -454,7 +427,7 @@ lemma example_q_to_q_right {j1 j2 : Fin 3} {a : TapeSymbol (Fin 2)} (h : (exampl
   all_goals simp [exampleStep] at h  -- Clear cases where it wouldn't end up in a .q state
   all_goals simp [exampleStep]  -- Work through the rest of the cases and see that they all move right
 
-lemma example_p_to_p_left {j1 j2 : Fin 2} {a : TapeSymbol (Fin 2)} (h : (exampleStep a (.p j1)).1 = .p j2) : (exampleStep a (.p j1)).2 = .left := by
+lemma example_p_to_p_left {j1 j2 : Fin 2} {a : TapeSymbol (Fin 2)} (h : (exampleStep a (.p j1)).1 = .other (.p j2)) : (exampleStep a (.p j1)).2 = .left := by
   rcases a with left | right | a
   case' symbol => -- Split symbol case by what the symbol is
     rcases fin2_lt_2 a with ha | ha
@@ -474,10 +447,10 @@ lemma example_p_to_p_left {j1 j2 : Fin 2} {a : TapeSymbol (Fin 2)} (h : (example
 theorem example_never_diverges {n : Nat} (w : Word (Fin 2) n) : ¬ example2DFA.diverges w := by
   apply TwoDFA.halts_of_next_except_halt_WF
   apply TwoDFA.next_except_halt_WF_of_encoding _ cfg_encoding
-  rintro c1 c2 ⟨hna, hnr, hnext⟩
+  rintro q1 p1 q2 p2 ⟨_, _, hnext⟩
   simp only [cfg_encoding, TwoDFA.WellFoundedEncoding.rel]
-  match c1, c2 with
-  | ⟨.q j1, p1⟩, ⟨.q j2, p2⟩ => 
+  match q1, q2 with
+  | .q j1, .q j2 => 
     simp only
     apply Prod.Lex.right
     conv at hnext =>
@@ -488,8 +461,8 @@ theorem example_never_diverges {n : Nat} (w : Word (Fin 2) n) : ¬ example2DFA.d
     conv at hnextmove =>
       lhs; arg 1; rw [example_q_to_q_right hnextstate]
     exact hnextmove.symm
-  | ⟨.q _, p1⟩, ⟨.p _, p2⟩ => apply Prod.Lex.left; simp
-  | ⟨.p j1, p1⟩, ⟨.p j2, p2⟩ => 
+  | .q _, .p _ => apply Prod.Lex.left; simp
+  | .p j1, .p j2 => 
     simp only
     apply Prod.Lex.right
     rw [Fin.rev_lt_rev]
@@ -501,17 +474,7 @@ theorem example_never_diverges {n : Nat} (w : Word (Fin 2) n) : ¬ example2DFA.d
     conv at hnextmove =>
       lhs; arg 1; rw [example_p_to_p_left hnextstate]
     exact hnextmove.symm
-  | ⟨.t, _⟩, c2 =>
-    suffices c2.state = .t by contradiction
-    apply example2DFA.accept_preserve_state w
-    exact .single hnext
-  | ⟨.r, _⟩, c2 =>
-    suffices c2.state = .r by contradiction
-    apply example2DFA.reject_preserve_state w
-    exact .single hnext
-  | ⟨.p _, p1⟩, ⟨.q _, p2⟩ => absurd hnext; apply example_never_p_to_q
-  | _, ⟨.t, _⟩ => simp [example2DFA] at hna
-  | _, ⟨.r, _⟩ => simp [example2DFA] at hnr
+  | .p _, .q _ => absurd hnext; apply example_never_p_to_q
 
 theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
   apply example2DFA.language_eq_of_inductive _ _ exampleCMInductive

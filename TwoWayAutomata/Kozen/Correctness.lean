@@ -18,9 +18,9 @@ namespace TwoDFA
 
 structure ConfigMeaning (n : Nat) (α σ : Type*) : Type _ where
   --- Meaning of being in the given state at the left end marker
-  atLeft : σ → Vector α n → Prop
+  atLeft : State σ → Vector α n → Prop
   --- Meaning of being in the given state at the given position in the input after the left endmarker
-  inWord : σ → SplitPredicate n α 
+  inWord : State σ → SplitPredicate n α 
 
 namespace ConfigMeaning
 
@@ -49,8 +49,8 @@ end ConfigMeaning
 
 theorem language_eq_of_inductive [Fintype σ] (m : TwoDFA α σ) (L : Language α) (cm : ∀ {n}, ConfigMeaning n α σ)
   (hind : ∀ {n}, cm.Inductive (n := n) m) 
-  (hacc : ∀ {w : List α}, cm.apply w.toWord ⟨m.accept, Fin.last _⟩ → w ∈ L)
-  (hrej : ∀ {w : List α}, cm.apply w.toWord ⟨m.reject, Fin.last _⟩ → w ∉ L)
+  (hacc : ∀ {w : List α}, cm.apply w.toWord ⟨.accept, Fin.last _⟩ → w ∈ L)
+  (hrej : ∀ {w : List α}, cm.apply w.toWord ⟨.reject, Fin.last _⟩ → w ∉ L)
   (hdiv : ∀ {w : List α}, m.diverges w.toWord → w ∉ L) :
     m.language = L := by
   unfold TwoDFA.language
@@ -70,8 +70,8 @@ theorem language_eq_of_inductive [Fintype σ] (m : TwoDFA α σ) (L : Language �
     | inr h =>
       rw [m.divergence_iff, ←or_iff_not_and_not] at h
       cases h with
-      | inl _ => assumption -- _ : m.accepts w
-      | inr _ => -- _ : m.rejects w
+      | inl => assumption -- _ : m.accepts w
+      | inr => -- _ : m.rejects w
         suffices w ∉ L by contradiction
         apply hrej
         apply hind.apply_of_reachable

@@ -155,7 +155,7 @@ theorem Movement.apply_ne_self {n : Nat} (i : Fin (n+2)) (mov : Movement) (valid
   rwa [Fin.ne_iff_vne, Fin.val_zero] at this
 
 theorem TwoDFA.step_move_always_valid {α : Type _} {σ : Type _} (m : TwoDFA α σ) {n : Nat} {x : Word α n}
-     {i : Fin (n+2)} {move : Movement} {s t : σ} (h : m.step (x.get i) s = ⟨ t, move ⟩) : move.isValid i := by
+     {i : Fin (n+2)} {move : Movement} {s t : State σ} (h : m.step (x.get i) s = ⟨ t, move ⟩) : move.isValid i := by
   constructor
   · if hz : i = 0
       then

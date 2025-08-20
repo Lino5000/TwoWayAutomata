@@ -18,20 +18,20 @@ variable {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n)
 
 def execute [DecidableEq σ] [fin_cfgs : Fintype (Config σ n)] : RunResult :=
   let last_config := m.runOn w fin_cfgs.card
-  if last_config.state = m.accept
+  if last_config.state = .accept
     then .accept
-    else if last_config.state = m.reject
+    else if last_config.state = .reject
       then .reject
       -- We step as many times as there are unique configurations; if we haven't terminated yet we never will
       else .cycle
 
 theorem execute_accept_iff_runOn_state_eq_accept [DecidableEq σ] [fin_cfgs : Fintype (Config σ n)] :
-    m.execute w = .accept ↔ (m.runOn w fin_cfgs.card).state = m.accept where
+    m.execute w = .accept ↔ (m.runOn w fin_cfgs.card).state = .accept where
   mp := by
     intro hexec
     by_contra hne
     simp [execute, hne] at hexec
-    if h : (m.runOn w (Fintype.card (Config σ n))).state = m.reject
+    if h : (m.runOn w (Fintype.card (Config σ n))).state = .reject
       then simp [h] at hexec
       else simp [h] at hexec
   mpr := by
@@ -110,12 +110,12 @@ theorem runOn_max_steps_of_reachable [Fintype σ] (cfg : Config σ n) (h : m.rea
         · exact Nat.lt_of_le_of_ne hle heq
         · exact runOn_steps_succ_eq_stp
 
-theorem accepts_of_runOn_max_eq_accept [Fintype σ] (i : Fin _) (h : m.runOn w (Fintype.card (Config σ n)) = ⟨m.accept, i⟩) : m.accepts w := by
+theorem accepts_of_runOn_max_eq_accept [Fintype σ] (i : Fin _) (h : m.runOn w (Fintype.card (Config σ n)) = ⟨.accept, i⟩) : m.accepts w := by
   use i
   rw [←h]
   apply reaches_runOn
 
-theorem accepts_iff_runOn_max_eq_accept [Fintype σ] : m.accepts w ↔ ∃ i, m.runOn w (Fintype.card (Config σ n)) = ⟨m.accept, i⟩ where
+theorem accepts_iff_runOn_max_eq_accept [Fintype σ] : m.accepts w ↔ ∃ i, m.runOn w (Fintype.card (Config σ n)) = ⟨.accept, i⟩ where
   mp := by
     intro hacc
     have hreach := m.reaches_accept_last_of_accepts w hacc

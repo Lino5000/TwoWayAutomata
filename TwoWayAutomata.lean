@@ -1,6 +1,7 @@
 --- All the modules that are part of Kozen 2DFAs
 import TwoWayAutomata.Kozen.Basics
 import TwoWayAutomata.Kozen.Configurations
+import TwoWayAutomata.Kozen.Conversion
 import TwoWayAutomata.Kozen.Correctness
 import TwoWayAutomata.Kozen.Execute
 import TwoWayAutomata.Kozen.Language

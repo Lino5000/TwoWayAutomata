@@ -59,161 +59,92 @@ def reaches (c : Config σ n) : Prop :=
   m.GoesTo x ⟨ m.start, 0 ⟩ c
 
 def accepts : Prop :=
-  ∃ i : Fin (n+2), m.reaches x ⟨ m.accept, i ⟩
+  ∃ i : Fin (n+2), m.reaches x ⟨ .accept, i ⟩
 
 def rejects : Prop :=
-  ∃ i : Fin (n+2), m.reaches x ⟨ m.reject, i ⟩
+  ∃ i : Fin (n+2), m.reaches x ⟨ .reject, i ⟩
 
 def language (m : TwoDFA α σ) : Language α :=
   {x : List α | m.accepts x.toWord }
 
-lemma Fin.predCast_get_valid {i j : Fin (n+1)} {h : i ≠ 0} (_ : i.predCast h = j) : i ≠ 0 := h
-lemma Fin.castLT_get_valid {i j : Fin n} {h : i.succ.val < n} (_ : i.succ.castLT h = j) : i.succ.val < n := h
 
-
-theorem accept_preserve_state (i : Fin (n+2)) (cfg : Config σ n) (h : m.GoesTo x ⟨ m.accept, i ⟩ cfg) : cfg.state = m.accept := by
+theorem accept_preserve_state (i : Fin (n+2)) (cfg : Config σ n) (h : m.GoesTo x ⟨ .accept, i ⟩ cfg) : cfg.state = .accept := by
   induction h with
   | refl => simp
   | @tail mid stp hd tl ih =>
-    have mid_def : mid = ⟨m.accept, mid.idx⟩ := by rw [←ih]
-    rcases hget : x.get mid.idx with left | right | a
-    all_goals
+    have mid_def : mid = ⟨.accept, mid.idx⟩ := by rw [←ih]
+    cases hget : x.get mid.idx; all_goals
       conv at tl =>
         rw [mid_def, ←m.stepConfig_gives_nextConfig]
-        simp only [stepConfig, hget]
+        simp only [stepConfig, step, hget]
         rw [Config.ext_iff]
-        simp only
-      have ⟨tlstate, tlidx⟩ := tl
-      have ⟨mv, hstep⟩ := m.halt_preserve_state (x.get mid.idx) |>.left
-      rw [hget] at hstep
-      unfold step at hstep
-      rw [hstep] at tlstate
-      simp [←tlstate]
+      exact tl.left.symm
 
-theorem reject_preserve_state (i : Fin (n+2)) (cfg : Config σ n) (h : m.GoesTo x ⟨ m.reject, i ⟩ cfg) : cfg.state = m.reject := by
+theorem reject_preserve_state (i : Fin (n+2)) (cfg : Config σ n) (h : m.GoesTo x ⟨.reject, i ⟩ cfg) : cfg.state = .reject := by
   induction h with
   | refl => simp
   | @tail mid stp hd tl ih =>
-    have mid_def : mid = ⟨m.reject, mid.idx⟩ := by rw [←ih]
-    rcases hget : x.get mid.idx with left | right | a
-    all_goals
+    have mid_def : mid = ⟨.reject, mid.idx⟩ := by rw [←ih]
+    cases hget : x.get mid.idx; all_goals
       conv at tl =>
         rw [mid_def, ←m.stepConfig_gives_nextConfig]
-        simp only [stepConfig, hget]
+        simp only [stepConfig, step, hget]
         rw [Config.ext_iff]
-        simp only
-      have ⟨tlstate, tlidx⟩ := tl
-      have ⟨mv, hstep⟩ := m.halt_preserve_state (x.get mid.idx) |>.right
-      rw [hget] at hstep
-      unfold step at hstep
-      rw [hstep] at tlstate
-      simp [←tlstate]
+      exact tl.left.symm
 
-theorem accept_move_right (i : Fin (n+2)) (hi : i ≠ Fin.last _) (cfg : Config σ n) (h : m.GoesTo x ⟨ m.accept, i⟩ cfg) : i ≤ cfg.idx := by
+theorem accept_move_right (i : Fin (n+2)) (hi : i ≠ Fin.last _) (cfg : Config σ n) (h : m.GoesTo x ⟨ .accept, i⟩ cfg) : i ≤ cfg.idx := by
   induction h with
   | refl => simp
   | @tail mid stp hd tl ih =>
-    have mid_def : mid = ⟨m.accept, mid.idx⟩ := by
+    have mid_def : mid = ⟨.accept, mid.idx⟩ := by
       have := m.accept_preserve_state x i mid hd
       rw [←this]
-    conv at tl =>
-      rw [mid_def, ←m.stepConfig_gives_nextConfig]
-      simp only [stepConfig]
-      rw [Config.ext_iff]
-      simp only
-    have ⟨tlstate, tlidx⟩ := tl
-
-    rcases hget : x.get mid.idx with left | right | a
-    case' left =>
-      have hstep : (m.step .left m.accept).2 = .right := by
-        have ⟨_, h⟩ := m.in_bounds_left m.accept
-        simp only [h]
-    case' right =>
-      have hstep : (m.step .right m.accept).2 = .left := by
-        have ⟨_, h⟩ := m.in_bounds_right m.accept
-        simp only [h]
-    case' symbol =>
-      have hstep : (m.step a m.accept).2 = .right := by
-        simp only [m.halt_move_right a]
-
+    cases hget : x.get mid.idx;
     all_goals
-      conv at tlidx =>
-        enter [1, 1]
-        rw [hget, hstep]
-      simp only [Movement.apply] at tlidx
-      rw [←tlidx]
-
+      conv at tl =>
+        rw [mid_def, ←m.stepConfig_gives_nextConfig]
+        simp only [stepConfig, step, hget]
+        rw [Config.ext_iff]
     case left | symbol =>
-      have : mid.idx.succ.val < n + 2 := Fin.castLT_get_valid tlidx
-      suffices mid.idx ≤ mid.idx.succ.castLT this from ih.trans this
-      simp [Fin.castLT, Fin.le_iff_val_le_val]
-
+      apply ih.trans
+      simp [←tl.right, Movement.apply, Fin.le_iff_val_le_val]
     case right =>
-      have : i < mid.idx := by
-        have hmid : mid.idx = Fin.last _ := x.eq_last_of_get_eq_right hget
+      have hmid : mid.idx = Fin.last _ := x.eq_last_of_get_eq_right hget
+      have mid_ne_zero : mid.idx ≠ 0 := by simp [hmid]
+      have hlt : i < mid.idx := by
         rw [←hmid] at hi
-        rw [Fin.lt_iff_le_and_ne]
-        simp [hi, ih]
-      rw [←Fin.le_castSucc_pred_iff] at this
-      have mid_ne_zero := Fin.predCast_get_valid tlidx
-      suffices (mid.idx.pred mid_ne_zero).castSucc = mid.idx.predCast mid_ne_zero by simpa [this]
-      simp only [Fin.castSucc, Fin.castAdd, Fin.predCast]
+        simp [Fin.lt_iff_le_and_ne, hi, ih]
+      rw [←Fin.le_castSucc_pred_iff mid_ne_zero] at hlt
+      suffices (mid.idx.pred mid_ne_zero).castSucc = stp.idx by simpa [this] using hlt
+      simp [←tl.right, Movement.apply, ←Fin.val_inj]
 
-theorem reject_move_right (i : Fin (n+2)) (hi : i ≠ Fin.last _) (cfg : Config σ n) (h : m.GoesTo x ⟨ m.reject, i⟩ cfg) : i ≤ cfg.idx := by
+theorem reject_move_right (i : Fin (n+2)) (hi : i ≠ Fin.last _) (cfg : Config σ n) (h : m.GoesTo x ⟨.reject, i⟩ cfg) : i ≤ cfg.idx := by
   induction h with
   | refl => simp
   | @tail mid stp hd tl ih =>
-    have mid_def : mid = ⟨m.reject, mid.idx⟩ := by
+    have mid_def : mid = ⟨.reject, mid.idx⟩ := by
       have := m.reject_preserve_state x i mid hd
-      rw [←this]
-    conv at tl =>
-      rw [mid_def, ←m.stepConfig_gives_nextConfig]
-      simp only [stepConfig]
-      rw [Config.ext_iff]
-      simp only
-    have ⟨tlstate, tlidx⟩ := tl
-
-    rcases hget : x.get mid.idx with left | right | a
-    case' left =>
-      have hstep : (m.step .left m.reject).2 = .right := by
-        have ⟨_, h⟩ := m.in_bounds_left m.reject
-        simp only [h]
-    case' right =>
-      have hstep : (m.step .right m.reject).2 = .left := by
-        have ⟨_, h⟩ := m.in_bounds_right m.reject
-        simp only [h]
-    case' symbol =>
-      have hstep : (m.step a m.reject).2 = .right := by
-        simp only [m.halt_move_right a]
-
+      ext <;> simp [this]
+    cases hget : x.get mid.idx
     all_goals
-      conv at tlidx =>
-        enter [1, 1]
-        rw [hget, hstep]
-      simp only [Movement.apply] at tlidx
-      rw [←tlidx]
-
+      conv at tl =>
+        rw [mid_def, ←m.stepConfig_gives_nextConfig]
+        simp only [stepConfig, step, hget]
+        rw [Config.ext_iff]
     case left | symbol =>
-      have : mid.idx.succ.val < n + 2 := Fin.castLT_get_valid tlidx
-      suffices mid.idx ≤ mid.idx.succ.castLT this from ih.trans this
-      simp [Fin.castLT, Fin.le_iff_val_le_val]
-
+      apply ih.trans
+      simp [←tl.right, Movement.apply, Fin.le_iff_val_le_val]
     case right =>
-      have : i < mid.idx := by
-        have hmid : mid.idx = Fin.last _ := x.eq_last_of_get_eq_right hget
+      have hmid : mid.idx = Fin.last _ := x.eq_last_of_get_eq_right hget
+      have mid_ne_zero : mid.idx ≠ 0 := by simp [hmid]
+      have hlt : i < mid.idx := by
         rw [←hmid] at hi
-        rw [Fin.lt_iff_le_and_ne]
-        simp [hi, ih]
-      rw [←Fin.le_castSucc_pred_iff] at this
-      have mid_ne_zero := Fin.predCast_get_valid tlidx
-      suffices (mid.idx.pred mid_ne_zero).castSucc = mid.idx.predCast mid_ne_zero by simpa [this]
-      simp only [Fin.castSucc, Fin.castAdd, Fin.predCast]
+        simp [Fin.lt_iff_le_and_ne, hi, ih]
+      rw [←Fin.le_castSucc_pred_iff mid_ne_zero] at hlt
+      suffices (mid.idx.pred mid_ne_zero).castSucc = stp.idx by simpa [this] using hlt
+      simp [←tl.right, Movement.apply, ←Fin.val_inj]
 
-theorem accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.accept, i ⟩ ⟨ m.accept, j ⟩ := by
-  have j_ne_zero : j ≠ 0 := Fin.ne_zero_of_lt h
-  have one_le_j : 1 ≤ j.val := by
-    suffices 1 ≤ j by simpa
-    exact Fin.one_le_of_ne_zero j_ne_zero
+theorem accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ .accept, i ⟩ ⟨ .accept, j ⟩ := by
   cases ha : x.get i with
   | right =>
     rw [Word.eq_last_of_get_eq_right ha] at h
@@ -221,17 +152,19 @@ theorem accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.accept
     simp [j.le_last]
   | left | symbol a =>
     clear ha
+    have j_ne_zero : j ≠ 0 := Fin.ne_zero_of_lt h
     have left_isValid_j : Movement.left.isValid j := by constructor <;> simp [j_ne_zero]
     let prevIdx := Movement.left.apply j left_isValid_j
     apply GoesTo.tail
-    · suffices m.GoesTo x ⟨ m.accept, i ⟩ ⟨ m.accept, prevIdx ⟩ from this
+    · suffices m.GoesTo x ⟨ .accept, i ⟩ ⟨ .accept, prevIdx ⟩ from this
       if heq : prevIdx = i
         then rw [heq]
         else
           apply accept_lt_accept i prevIdx
           have prev_def : prevIdx = j.predCast j_ne_zero := rfl
-          suffices i ≤ prevIdx by simp [Fin.lt_iff_le_and_ne, this, heq, Ne.symm]
+          suffices i ≤ prevIdx by simpa [Fin.lt_iff_le_and_ne, heq, Ne.symm]
           rw [Fin.lt_def] at h
+          have one_le_j : 1 ≤ j.val := by simpa using Fin.one_le_of_ne_zero j_ne_zero
           simpa [prev_def, Fin.le_def, Nat.le_sub_iff_add_le one_le_j]
     · have prevIdx_ne_last : prevIdx ≠ Fin.last (n+1) := by
         apply Fin.ne_of_lt
@@ -249,11 +182,7 @@ theorem accept_lt_accept (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.accept
     exact Movement.lt_of_apply_left j
   }
 
-theorem reject_lt_reject (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.reject, i ⟩ ⟨ m.reject, j ⟩ := by
-  have j_ne_zero : j ≠ 0 := Fin.ne_zero_of_lt h
-  have one_le_j : 1 ≤ j.val := by
-    suffices 1 ≤ j by simpa
-    exact Fin.one_le_of_ne_zero j_ne_zero
+theorem reject_lt_reject (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ .reject, i ⟩ ⟨ .reject, j ⟩ := by
   cases ha : x.get i with
   | right =>
     rw [Word.eq_last_of_get_eq_right ha] at h
@@ -261,17 +190,21 @@ theorem reject_lt_reject (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.reject
     simp [j.le_last]
   | left | symbol a =>
     clear ha
+    have j_ne_zero : j ≠ 0 := Fin.ne_zero_of_lt h
     have left_isValid_j : Movement.left.isValid j := by constructor <;> simp [j_ne_zero]
     let prevIdx := Movement.left.apply j left_isValid_j
     apply GoesTo.tail
-    · suffices m.GoesTo x ⟨ m.reject, i ⟩ ⟨ m.reject, prevIdx ⟩ from this
+    · suffices m.GoesTo x ⟨ .reject, i ⟩ ⟨ .reject, prevIdx ⟩ from this
       if heq : prevIdx = i
         then rw [heq]
         else
           apply reject_lt_reject i prevIdx
           have prev_def : prevIdx = j.predCast j_ne_zero := rfl
-          suffices i ≤ prevIdx by simp [Fin.lt_iff_le_and_ne, this, heq, Ne.symm]
+          suffices i ≤ prevIdx by simpa [Fin.lt_iff_le_and_ne, heq, Ne.symm]
           rw [Fin.lt_def] at h
+          have one_le_j : 1 ≤ j.val := by
+            suffices 1 ≤ j by simpa
+            exact Fin.one_le_of_ne_zero j_ne_zero
           simpa [prev_def, Fin.le_def, Nat.le_sub_iff_add_le one_le_j]
     · have prevIdx_ne_last : prevIdx ≠ Fin.last (n+1) := by
         apply Fin.ne_of_lt
@@ -290,7 +223,7 @@ theorem reject_lt_reject (i j : Fin (n+2)) (h : i < j) : m.GoesTo x ⟨ m.reject
   }
 
 
-theorem reaches_accept_last_of_accepts (haccept : m.accepts x) : m.reaches x ⟨ m.accept, Fin.last (n+1) ⟩ := by
+theorem reaches_accept_last_of_accepts (haccept : m.accepts x) : m.reaches x ⟨ .accept, Fin.last (n+1) ⟩ := by
   rcases haccept with ⟨idx, hidx⟩
   if h : idx = Fin.last (n+1)
     then rwa [← h]
@@ -301,7 +234,7 @@ theorem reaches_accept_last_of_accepts (haccept : m.accepts x) : m.reaches x ⟨
       · apply m.accept_lt_accept x idx (Fin.last _)
         exact Fin.lt_last_iff_ne_last.mpr h
 
-theorem reaches_reject_last_of_rejects (hreject : m.rejects x) : m.reaches x ⟨ m.reject, Fin.last (n+1) ⟩ := by
+theorem reaches_reject_last_of_rejects (hreject : m.rejects x) : m.reaches x ⟨ .reject, Fin.last (n+1) ⟩ := by
   rcases hreject with ⟨idx, hidx⟩
   if h : idx = Fin.last (n+1)
     then rwa [← h]
@@ -323,22 +256,17 @@ theorem single_path {strt stp1 stp2 : Config σ n} (h1 : m.GoesTo x strt stp1) (
       suffices mid1 = mid2 by apply ih1; rwa [this]
       exact nextConfig_right_unique hnext1 hnext2
 
-theorem not_accept_and_reject : ¬ (m.reaches x ⟨m.accept, Fin.last _⟩ ∧ m.reaches x ⟨m.reject, Fin.last _⟩) := by
+theorem not_accept_and_reject : ¬ (m.reaches x ⟨.accept, Fin.last _⟩ ∧ m.reaches x ⟨.reject, Fin.last _⟩) := by
   by_contra h
   cases m.single_path x h.left h.right with
   | inl h =>
     clear * - h
-    have := m.accept_preserve_state x (Fin.last _) ⟨m.reject, Fin.last _⟩ h
-    simp only at this
-    have := m.distinct_tr.symm
-    contradiction
+    have := m.accept_preserve_state x (Fin.last _) ⟨.reject, Fin.last _⟩ h
+    simp at this
   | inr h =>
     clear * - h
-    have := m.reject_preserve_state x (Fin.last _) ⟨m.accept, Fin.last _⟩ h
-    simp only at this
-    have := m.distinct_tr
-    contradiction
-
+    have := m.reject_preserve_state x (Fin.last _) ⟨.accept, Fin.last _⟩ h
+    simp at this
 
 
 def CyclesAt (c : Config σ n) : Prop :=
@@ -360,18 +288,6 @@ theorem as_head {c : Config σ n} (h : m.CyclesAt x c) : ∃ next, m.nextConfig 
     constructor
     · exact hd
     · exact tl.tail link
-
-def equiv {c1 c2 : Config σ n} : m.CyclesAt x c1 → m.CyclesAt x c2 → Prop :=
-  fun _ _ ↦ m.GoesTo x c1 c2
-
-@[refl]
-theorem equiv_refl {c1 : Config σ n} (h : m.CyclesAt x c1) : h.equiv h := 
-  .refl
-
-@[trans]
-theorem equiv_trans {c1 c2 c3 : Config σ n} (cy1 : m.CyclesAt x c1) (cy2 : m.CyclesAt x c2) (cy3 : m.CyclesAt x c3)
-  (h1 : cy1.equiv cy2) (h2 : cy2.equiv cy3) : cy1.equiv cy3 := 
-    h1.trans h2
 
 theorem step {c1 c2 : Config σ n} (cyc : m.CyclesAt x c1) (h : m.nextConfig x c1 c2) : m.CyclesAt x c2 := by
   obtain ⟨last, ⟨path, link⟩⟩ := cyc
@@ -399,52 +315,17 @@ theorem split {c1 c2 : Config σ n} (cyc : m.CyclesAt x c1) (h : m.GoesTo x c1 c
     obtain ⟨_, link, path⟩ := cyc.as_head
     rwa [nextConfig_right_unique link hd] at path
 
-@[symm]
-theorem equiv_symm {c1 c2 : Config σ n} (h1 : m.CyclesAt x c1) (h2 : m.CyclesAt x c2) :
-    h1.equiv h2 ↔ h2.equiv h1 := by
-  constructor
-  case' mp => have hi := h1
-  case' mpr => have hi := h2
-  all_goals
-    intro h'
-    have ⟨_, ⟨hgoes, hnext⟩⟩ := hi
-    cases m.single_path x h' hgoes with
-    | inl hrest => exact hrest.tail hnext
-    | inr hrest =>
-      apply hi.split
-      exact hgoes.trans hrest
-
 end CyclesAt
 
-abbrev diverges : Prop := ∃ c : Config σ n, m.reaches x c ∧ m.CyclesAt x c ∧ c.state ≠ m.accept ∧ c.state ≠ m.reject
+abbrev diverges : Prop := ∃ q i, m.reaches x ⟨.other q, i⟩ ∧ m.CyclesAt x ⟨.other q, i⟩
 
-theorem accept_cycle : m.CyclesAt x ⟨m.accept, Fin.last _⟩ := by
-  let last : Config σ n := ⟨ m.accept, (Fin.last _).predCast <| by simp ⟩
-  use last
-  constructor
-  · apply GoesTo.single
-    exact m.config_accept_at_rightEnd x
-  · apply m.config_accept_not_at_rightEnd x last.idx
-    rw [Fin.ne_iff_vne]
-    simp [last]
-
-theorem reject_cycle : m.CyclesAt x ⟨m.reject, Fin.last _⟩ := by
-  let last : Config σ n := ⟨ m.reject, (Fin.last _).predCast <| by simp ⟩
-  use last
-  constructor
-  · apply GoesTo.single
-    exact m.config_reject_at_rightEnd x
-  · apply m.config_reject_not_at_rightEnd x last.idx
-    rw [Fin.ne_iff_vne]
-    simp [last]
-
-theorem accept_all_cycles (hacc : m.accepts x) {c : Config σ n} (hreach : m.reaches x c) (hcyc : m.CyclesAt x c) : c.state = m.accept := by
+theorem accept_all_cycles (hacc : m.accepts x) {c : Config σ n} (hreach : m.reaches x c) (hcyc : m.CyclesAt x c) : c.state = .accept := by
   obtain ⟨_, hacc⟩ := hacc
   rcases m.single_path x hacc hreach with h | h
   case' intro.inr => have h := hcyc.split h
   all_goals exact accept_preserve_state _ _ _ _ h
 
-theorem reject_all_cycles (hrej : m.rejects x) {c : Config σ n} (hreach : m.reaches x c) (hcyc : m.CyclesAt x c) : c.state = m.reject := by
+theorem reject_all_cycles (hrej : m.rejects x) {c : Config σ n} (hreach : m.reaches x c) (hcyc : m.CyclesAt x c) : c.state = .reject := by
   obtain ⟨_, hrej⟩ := hrej
   rcases m.single_path x hrej hreach with h | h
   case' intro.inr => have h := hcyc.split h
@@ -544,7 +425,7 @@ theorem divergence_iff [Fintype σ] : m.diverges x ↔ (¬m.accepts x ∧ ¬m.re
     intro hdiv
     by_contra hterm
     rw [←not_or, not_not] at hterm
-    obtain ⟨_, hreach, cyc, _, _⟩ := hdiv
+    obtain ⟨q, i, hreach, cyc⟩ := hdiv
     cases hterm with
     | inl hacc =>
       have := m.accept_all_cycles x hacc hreach cyc
@@ -554,18 +435,14 @@ theorem divergence_iff [Fintype σ] : m.diverges x ↔ (¬m.accepts x ∧ ¬m.re
       contradiction
   mpr := by
     rintro ⟨hacc, hrej⟩
-    obtain ⟨base, hreach, hcyc⟩ := m.will_cycle x
-    use base
-    refine ⟨hreach, hcyc, ?_, ?_⟩
-    · by_contra h
-      suffices m.accepts x by contradiction
-      use base.idx
-      rw [←h]
-      exact hreach
-    · by_contra h
-      suffices m.rejects x by contradiction
-      use base.idx
-      rw [←h]
-      exact hreach
+    obtain ⟨⟨q, i⟩, hreach, hcyc⟩ := m.will_cycle x
+    cases q with
+    | other q => exact ⟨q, i, hreach, hcyc⟩
+    | accept =>
+      unfold TwoDFA.accepts at hacc
+      absurd hacc; use i
+    | reject =>
+      unfold TwoDFA.rejects at hrej
+      absurd hrej; use i
 
 end TwoDFA

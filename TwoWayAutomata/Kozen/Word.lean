@@ -9,6 +9,7 @@ universe u v
 
 namespace Word
 
+@[simp]
 theorem get_eq_left_of_eq_zero {α : Type u} {n : Nat} {w : Word α n} {i : Fin (n+2)} : i = 0 → w.get i = .left := by
   intro h
   simp only [↓reduceDIte, Word.get, h]
@@ -28,6 +29,7 @@ theorem get_eq_left_iff_eq_0 {α : Type u} {n : Nat} {w : Word α n} {i : Fin (n
   mpr := Word.get_eq_left_of_eq_zero
   mp := Word.eq_zero_of_get_eq_left
 
+@[simp]
 theorem get_eq_right_of_eq_last {α : Type u} {n : Nat} {w : Word α n} {i : Fin (n+2)} : i = Fin.last (n+1) → w.get i = .right := by
   intro h
   simp [h, Word.get, Fin.pred, Fin.subNat, Fin.last]
@@ -65,122 +67,6 @@ theorem eq_last_of_get_eq_right {α : Type u} {n : Nat} {w : Word α n} {i : Fin
 theorem get_eq_right_iff_eq_last {α : Type u} {n : Nat} {w : Word α n} {i : Fin (n+2)} : i = Fin.last (n+1) ↔ w.get i = .right where
   mp := Word.get_eq_right_of_eq_last
   mpr := Word.eq_last_of_get_eq_right
-
-@[match_pattern]
-def nil {α : Type u} : Word α 0 := ⟨ { toArray := #[], size_toArray := by simp } ⟩
-
-@[match_pattern]
-def cons {α : Type u} {n : Nat} (w : Word α n) (a : α) : Word α (n+1) :=
-  ⟨ w.val.insertIdx 0 a ⟩
-
-theorem cons_as_list {α : Type u} {n : Nat} (xs : List α) (hxs : xs.length = n) (a : α) :
-    (⟨⟨xs⟩, hxs⟩ : Word α n).cons a = ⟨⟨a :: xs⟩, by rw [←hxs]; exact List.length_cons⟩ := by
-  simp [Word.cons]
-
-theorem cons_toList {α : Type u} {n : Nat} (w : Word α n) (a : α) :
-    (w.cons a).val.toList = a :: w.val.toList := by
-  simp [Word.cons, Vector.cast, Vector.toList_toArray]
-
-def push {α : Type u} {n : Nat} (w : Word α n) (a : α) : Word α (n+1) :=
-  ⟨ w.val.push a ⟩
-
-theorem get_push_lt {α : Type u} {n : Nat} (w : Word α n) (a : α) (i : Fin (n+2)) (h : i < Fin.last (n+1)) :
-    w.get i = (w.push a).get (i.castLE <| by simp) := by
-  cases i using Fin.cases with
-  | zero =>
-    simp only [Fin.castLE_zero]
-    rw [Word.get_eq_left_of_eq_zero, Word.get_eq_left_of_eq_zero]
-    <;> rfl
-  | succ i =>
-    unfold Word.get
-    simp only [Fin.pred_succ, Fin.castLE_succ, Nat.succ_eq_add_one]
-    have not_zero : i.succ ≠ 0 := Fin.succ_ne_zero i
-    have not_last : i ≠ Fin.last n := by
-      apply Fin.ne_of_lt
-      rwa [← Fin.succ_lt_succ_iff, Fin.succ_last]
-    simp [not_zero, not_last]
-
-    let j : Fin (n+2) := i.castLE <| by simp
-    have cast_not_zero : j.succ ≠ 0 := Fin.succ_ne_zero j
-    have cast_not_last : j ≠ Fin.last (n+1) := by
-      rw [← Fin.val_ne_iff]
-      simp only [Fin.coe_castLE, Fin.val_last, j]
-      exact  Nat.ne_of_lt i.is_lt
-    simp [j, cast_not_zero, cast_not_last]
-
-    unfold Vector.get
-    unfold Word.push
-    simp only [Fin.coe_cast, Fin.coe_castPred, Fin.coe_castLE, j]
-    symm
-    apply Vector.getElem_push_lt
-    apply Nat.lt_of_le_of_ne
-    · have le_n := Fin.le_last i
-      simp only [Fin.le_def, Fin.val_last, j] at le_n
-      assumption
-    · rwa [← Fin.val_ne_iff, Fin.val_last] at not_last
-
-theorem get_push_eq {α : Type u} {n : Nat} (w : Word α n) (a : α) (i : Fin (n+2)) (h : i = Fin.last (n+1)) :
-    (w.push a).get (i.castLE <| by simp) = a := by
-  have not_zero : (i.castLE <| by simp) ≠ (0 : Fin (n+3)) := by simp [h, Fin.castLE]
-  have pred_not_last : (i.castLE <| by simp).pred not_zero ≠ Fin.last (n+1) := by simp [h, Fin.castLE, Fin.last]
-  simp [get, push, not_zero, pred_not_last]
-  simp [Vector.get, h]
-  exact Vector.getElem_push_eq
-
-def reverse {α : Type u} {n : Nat} (w : Word α n) : Word α n :=
-  ⟨ w.val.reverse ⟩
-
-@[simp]
-theorem push_eq_reverse_cons {α : Type u} {n : Nat} (w : Word α n) (a : α) : w.cons a = (w.reverse.push a).reverse := by
-  unfold Word.push
-  unfold Word.reverse
-  unfold Word.cons
-  simp only [Vector.insertIdx_zero, Vector.reverse_push, Vector.reverse_reverse]
-
-@[simp]
-theorem reverse_reverse {α : Type u} {n : Nat} (w : Word α n) : w.reverse.reverse = w := by
-  unfold Word.reverse
-  simp only [Vector.reverse_reverse]
-
-theorem reverse_nil {α : Type u} : Word.nil.reverse = (Word.nil : Word α 0) := by
-  simp only [reverse, nil, Vector.reverse_mk, List.reverse_toArray, List.reverse_nil]
-
-@[elab_as_elim]
-def induction {α : Type u} {motive : ∀ {n : Nat}, Word α n → Sort _} (hnil : motive .nil)
-    (hcons : ∀ {n : Nat}, ∀ a : α, ∀ w : Word α n, motive w → motive (w.cons a)) :
-    ∀ {n : Nat}, ∀ w : Word α n, motive w 
-  | n, ⟨ wval ⟩ => wval.elimAsList go
-  where
-    go : {n : Nat} → (xs : List α) → (ha : xs.length = n) → motive ⟨⟨xs⟩, ha⟩
-    | 0, .nil, ha => by
-      have : ⟨⟨.nil⟩, ha⟩ = Word.nil := by rfl
-      rw [this]
-      exact hnil
-    | k+1, .cons x xs, ha => by
-      have hxs_len : xs.length = k := by
-        rw [List.length_cons, Nat.add_left_inj] at ha
-        exact ha
-      let w : Word α k := ⟨⟨xs⟩, hxs_len⟩
-      have hind : motive w := go xs hxs_len
-      have := hcons x w hind
-      rw [Word.cons_as_list] at this
-      exact this
-
-@[elab_as_elim]
-def inductionPush {α : Type u} {motive : ∀ {n : Nat}, Word α n → Sort _} (hnil : motive .nil)
-    (hpush : ∀ {n : Nat}, ∀ a : α, ∀ w : Word α n, motive w → motive (w.push a)) {n : Nat} (w : Word α n) :
-    motive w := by
-  let revMotive := fun {k : Nat} => fun (w : Word α k) => motive w.reverse
-  have hrevNil : revMotive .nil := hnil
-  have hrevCons : ∀ {k : Nat}, ∀ a : α, ∀ w : Word α k, revMotive w → revMotive (w.cons a) := by
-    intro k a w hind
-    unfold revMotive
-    rw [push_eq_reverse_cons, reverse_reverse]
-    exact hpush a w.reverse hind
-  have := Word.induction (motive := revMotive) hrevNil hrevCons w.reverse
-  unfold revMotive at this
-  rw [Word.reverse_reverse] at this
-  exact this
 
 end Word
 
@@ -228,6 +114,7 @@ theorem Fin.internal.val_succ_lt {n : Nat} {i : Fin (n+2)} (int : i.internal) : 
   rw [←Fin.lt_last_iff_ne_last, Fin.lt_iff_val_lt_val] at this
   simpa
 
+@[simp]
 def Word.get_eq_symbol_of_internal {α : Type u} {n : Nat} (w : Word α n) {i : Fin (n+2)} (int : i.internal) :
     w.get i = .symbol (w.val.get int.val) := by
   have not_left : w.get i ≠ .left := Word.get_neq_left_of_neq_zero int.left
@@ -268,10 +155,12 @@ theorem Word.get_eq_symbol_iff_internal {α : Type u} {n : Nat} (w : Word α n) 
 def Word.getInternal {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (int : i.internal) : α :=
   w.val.get int.val
 
+@[simp]
 theorem Word.getInternal_eq_getElem {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (int : i.internal) :
     w.getInternal i int = w.val[int.val] := by
   simp [getInternal, Vector.get]
 
+@[simp]
 theorem Word.getInternal_eq_get {α : Type _} {n : Nat} (w : Word α n) (i : Fin (n+2)) (int : i.internal) :
     w.getInternal i int = w.get i := by
   simp [getInternal, get, int.left, int.pred_ne_last, Fin.internal.val]
@@ -300,6 +189,7 @@ abbrev split_spec {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i
 theorem Word.split_meets_spec {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_spec w i h := by
   simp [split_spec, split, h, Vector.cast]
 
+@[simp]
 theorem Word.split_append {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) :
     (w.split i h).1 ++ (w.split i h).2 = Vector.cast (split_lens_add_to_n n i h).symm w.val := by
   simp [Word.split, Vector.cast]
@@ -321,9 +211,11 @@ theorem Word.split_last {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) 
   · simp [←Vector.toArray_inj, hi]
   · simp [←Vector.toArray_inj, Vector.toArray_extract, Vector.toArray_cast, hi]
 
-abbrev Fin.predCast {n : Nat} (i : Fin (n+1)) (h : i ≠ 0) : Fin (n+1) := (i.pred h).castLE <| by simp
+@[reducible]
+def Fin.predCast {n : Nat} (i : Fin (n+1)) (h : i ≠ 0) : Fin (n+1) := (i.pred h).castLE <| by simp
 
-abbrev Fin.succCast {n : Nat} (i : Fin (n+1)) (h : i ≠ Fin.last n) : Fin (n+1) := i.succ.castLT <| by
+@[reducible]
+def Fin.succCast {n : Nat} (i : Fin (n+1)) (h : i ≠ Fin.last n) : Fin (n+1) := i.succ.castLT <| by
   rw [Fin.val_succ, Nat.add_one_lt_add_one_iff]
   exact i.val_lt_last h
 
@@ -455,8 +347,9 @@ lemma List.toWord_val_getElem_eq_getElem {α : Type u} (w : List α) (i : Fin w.
   conv =>
     rhs; pattern w
     rw [this]
-  simp
+  simp only [Vector.getElem_toList, Fin.getElem_fin]
 
+@[simp]
 theorem Word.toWord_get_internal {α : Type u} (w : List α) (i : Fin (w.length + 1)) (int : i.succ.internal) :
     w.toWord.get i.succ = w[i.val]'(int.val_pred_lt) := by
   apply w.toWord.getInternal_eq_get _ int |>.symm.trans

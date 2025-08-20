@@ -1,7 +1,7 @@
 name = "two_way_automata"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["TwoWayAutomata"]
+defaultTargets = ["TwoWayAutomata", "TwoWayAutomata.KozenExample", "TwoWayAutomata.NonTermExample"]
 
 # precompileModules = true
 
