@@ -5,6 +5,7 @@ inductive TapeSymbol (α : Type _) : Type _ where
   | left : TapeSymbol α
   | right : TapeSymbol α
   | symbol : α → TapeSymbol α
+  deriving DecidableEq
 
 instance {α : Type _} : Coe α (TapeSymbol α) where
   coe := TapeSymbol.symbol
