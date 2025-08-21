@@ -25,85 +25,46 @@ def example2DFA : TwoDFA (Fin 2) ExampleState where
     simp [exampleStep]
 
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
-  atLeft 
-    | .other .q, _ => True
-    | .accept, w => w.all (· == 1)
-    | .reject, w => w.any (· != 1)
-  inWord
-    | .other .q, _ => fun ⟨wl, _⟩ ↦ wl.all (· == 1)
-    | .accept, _ => fun ⟨wl, wr⟩ ↦ (wl ++ wr).all (· == 1)
-    | .reject, _ => fun ⟨wl, wr⟩ ↦ (wl ++ wr).any (· != 1)
+  accept w := w.all (· == 1)
+  reject w := w.any (· != 1)
+  atLeft | .q, _ => True
+  inWord | .q, _ => fun ⟨wl, _⟩ ↦ wl.all (· == 1)
 
 theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) example2DFA where
-  base := by simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, example2DFA]
+  base := by simp [exampleConfigMeaning, example2DFA]
   ind := by
-    rintro w ⟨s, i⟩ hind
+    rintro w s i hind
     let get_res := w.get i
     match hs : s, hget : get_res with
-    | .accept, .left | .reject, .left =>
-      have hleft : i = 0 := w.eq_zero_of_get_eq_left hget
-      rw [hleft]; rw [hleft] at hind
-      conv at hget => unfold get_res; rw [hleft]
-      simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
-      simp only [Movement.apply, Fin.castLT, Fin.succ_zero_eq_one, Fin.coe_ofNat_eq_mod,
-        Nat.one_mod, Fin.mk_one]
-      conv at hind =>
-        simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
-        simp only [SplitPredicate.apply, Word.split_append]
-      simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
-      simp only [SplitPredicate.apply, Word.split_append, Vector.all_cast, Vector.any_cast]
-      exact hind
-    | .accept, .right | .reject, .right | .other .q, .right =>
+    | .q, .right =>
       have hright : i = Fin.last _ := w.eq_last_of_get_eq_right hget
       rw [hright]; rw [hright] at hind
       conv at hget => unfold get_res; rw [hright]
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
-      simp only [Movement.apply, Fin.predCast, Fin.castLE, Fin.coe_pred, Fin.val_last,
-        add_tsub_cancel_right]
+      simp only [Movement.apply, Fin.predCast, Fin.castLE, Fin.coe_pred, Fin.val_last, add_tsub_cancel_right]
       have last_ne_zero : Fin.last (n+1) ≠ 0 := by symm; simp
       conv at hind =>
         simp only [TwoDFA.ConfigMeaning.apply, last_ne_zero, ↓reduceDIte]
         simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Word.split_last, Vector.all_cast, Vector.any_cast]
       if hn : n = 0
-        then
-          simp only [TwoDFA.ConfigMeaning.apply, hn, Fin.zero_eta, ↓reduceDIte]
-          simp only [SplitPredicate.apply, exampleConfigMeaning]
-          exact hind
+        then simp [TwoDFA.ConfigMeaning.apply, hn, exampleConfigMeaning]
         else
           have : ⟨n, by simp⟩ ≠ (0 : Fin (n+2)) := by
             rw [←Fin.zero_eta, Fin.ne_iff_vne]
             simp [hn]
-          simp only [TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
-          simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
-          exact hind
-    | .accept, .symbol a | .reject, .symbol a =>
-      unfold get_res at hget
-      have hint : i.internal := w.internal_of_get_eq_symbol ⟨a, hget⟩
-      simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
-      simp only [Movement.apply, Fin.predCast, Fin.castLE, Fin.coe_pred, Fin.val_last,
-        add_tsub_cancel_right]
-      conv at hind =>
-        simp only [TwoDFA.ConfigMeaning.apply, hint.left, ↓reduceDIte]
-        simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
-      have : i.succ.castLT hint.val_succ_lt ≠ (0 : Fin (n+2)) := by 
-        rw [←Fin.zero_eta, Fin.ne_iff_vne]
-        simp
-      simp only [TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
-      simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
-      exact hind
-    | .other .q, .left =>
+          simpa only [TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte, exampleConfigMeaning]
+    | .q, .left =>
       have hleft : i = 0 := w.eq_zero_of_get_eq_left hget
       rw [hleft]; rw [hleft] at hind
       conv at hget => unfold get_res; rw [hleft]
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
-      simp only [Movement.apply, Fin.castLT, Fin.succ_zero_eq_one, Fin.coe_ofNat_eq_mod,
-        Nat.one_mod, Fin.mk_one]
+      simp only [Movement.apply, Fin.castLT, Fin.succ_zero_eq_one, Fin.coe_ofNat_eq_mod, Nat.one_mod, Fin.mk_one]
       conv at hind =>
         simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
         simp only [SplitPredicate.apply, Word.split_append]
       simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
       simp [SplitPredicate.apply, Word.split_one]
-    | .other .q, .symbol 0 =>
+    | .q, .symbol 0 =>
       unfold get_res at hget
       have hint : i.internal := w.internal_of_get_eq_symbol ⟨_, hget⟩
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
@@ -112,9 +73,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
         simp only [TwoDFA.ConfigMeaning.apply, hint.left, ↓reduceDIte]
         simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
       if hpred : i.predCast hint.left = 0 
-        then
-          simp only [TwoDFA.ConfigMeaning.apply, hpred, ↓reduceDIte]
-          simp only [SplitPredicate.apply, exampleConfigMeaning]
+        then simp [hpred, exampleConfigMeaning]
         else
           simp only [TwoDFA.ConfigMeaning.apply, hpred, ↓reduceDIte]
           simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
@@ -126,7 +85,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
             rw [w.split_pred _ this]
             simp only [Vector.all_cast, Vector.all_push, Bool.and_eq_true]
           exact hind.left
-    | .other .q, .symbol 1 =>
+    | .q, .symbol 1 =>
       unfold get_res at hget
       have hint : i.internal := w.internal_of_get_eq_symbol ⟨_, hget⟩
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
@@ -143,8 +102,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       simp only [Vector.all_cast, Vector.all_push, Bool.and_eq_true]
       constructor
       · assumption
-      · have := w.getInternal_eq_get _ hint |>.trans hget
-        simpa
+      · simpa using w.getInternal_eq_get _ hint |>.trans hget
 
 def cfg_encoding : TwoDFA.WellFoundedEncoding ExampleState where
   E := fun n ↦ Fin (n+2)
@@ -172,7 +130,7 @@ lemma eq_one_of_allOnes_of_get_eq_symbol {w : List (Fin 2)} {p : Fin (w.length +
 theorem example_halts_of_allOnes {w : List (Fin 2)} (h : allOnes w) : ¬example2DFA.diverges w.toWord := by
   apply TwoDFA.halts_of_next_except_halt_WF
   apply TwoDFA.next_except_halt_WF_of_encoding _ cfg_encoding
-  rintro ⟨q⟩ p1 ⟨q⟩ p2 ⟨_, _, hnext⟩
+  rintro ⟨q⟩ p1 ⟨q⟩ p2 hnext
   simp only [cfg_encoding, TwoDFA.WellFoundedEncoding.rel]
   simp only [example2DFA, ← TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, TwoDFA.Config.mk.injEq] at hnext
   obtain ⟨hstate, hpos⟩ := hnext

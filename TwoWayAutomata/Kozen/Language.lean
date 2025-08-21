@@ -387,20 +387,18 @@ theorem run_repeats_offset {step1 step2 off : Nat} (h : m.runOn x step1 = m.runO
 
 theorem run_repeats [fin_card : Fintype (Config σ n)] : ∃ i k : Nat, k ≠ 0 ∧ m.runOn x i = m.runOn x (i + k) := by
   obtain ⟨u, v, hne, hrep⟩ := Finite.exists_ne_map_eq_of_infinite (m.runOn x)
-  rcases em (u < v) with hlt | hlt
-  case' inl =>
+  by_cases hlt : u < v
+  case' pos =>
     let a := u
     let b := v
     have hlt : a < b := hlt
     have hrep : m.runOn x a = m.runOn x b := hrep
-  case' inr =>
+  case' neg =>
     let a := v
     let b := u
     have hlt : a < b := by
       rcases Nat.lt_trichotomy u v with _ | _ | _
-      · contradiction
-      · contradiction
-      · assumption
+      <;> first | contradiction | assumption
     have hrep : m.runOn x a = m.runOn x b := hrep.symm
   all_goals
     clear * - hlt hrep
@@ -426,23 +424,17 @@ theorem divergence_iff [Fintype σ] : m.diverges x ↔ (¬m.accepts x ∧ ¬m.re
     by_contra hterm
     rw [←not_or, not_not] at hterm
     obtain ⟨q, i, hreach, cyc⟩ := hdiv
-    cases hterm with
-    | inl hacc =>
-      have := m.accept_all_cycles x hacc hreach cyc
+    rcases hterm with hacc | hrej
+    · have := m.accept_all_cycles x hacc hreach cyc
       contradiction
-    | inr hrej =>
-      have := m.reject_all_cycles x hrej hreach cyc
+    · have := m.reject_all_cycles x hrej hreach cyc
       contradiction
   mpr := by
     rintro ⟨hacc, hrej⟩
     obtain ⟨⟨q, i⟩, hreach, hcyc⟩ := m.will_cycle x
     cases q with
     | other q => exact ⟨q, i, hreach, hcyc⟩
-    | accept =>
-      unfold TwoDFA.accepts at hacc
-      absurd hacc; use i
-    | reject =>
-      unfold TwoDFA.rejects at hrej
-      absurd hrej; use i
+    | accept => absurd hacc; use i -- these two find hreach to close
+    | reject => absurd hrej; use i
 
 end TwoDFA

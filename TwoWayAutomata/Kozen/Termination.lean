@@ -35,14 +35,12 @@ theorem TransGen_next_except_halt_of_GoesTo_except_halt_of_ne (c1 c2 : Config σ
   | @tail mid _ _ tl ih =>
     have hna' : mid.state ≠ .accept := ne_accept_of_next_ne_accept _ _ hna tl
     have hnr' : mid.state ≠ .reject := ne_reject_of_next_ne_reject _ _ hnr tl
-    cases em (c1 = mid) with
-    | inl heq' =>
-      apply Relation.TransGen.single
+    by_cases heq' : c1 = mid
+    · apply Relation.TransGen.single
       rw [heq']
       exact ⟨hna, hnr, tl⟩
-    | inr hne' =>
-      apply Relation.TransGen.tail
-      · exact ih hna' hnr' hne'
+    · apply Relation.TransGen.tail
+      · exact ih hna' hnr' heq'
       · exact ⟨hna, hnr, tl⟩
 
 theorem halts_of_next_except_halt_WF (hwf : WellFounded (m.next_except_halt x)) : ¬ m.diverges x := by
@@ -82,7 +80,7 @@ theorem CfgRel_def (wfe : WellFoundedEncoding σ) {n : Nat} {q1 q2 : σ} {i1 i2 
 end WellFoundedEncoding
 
 theorem next_except_halt_WF_of_encoding (m : TwoDFA α σ) (wfe : WellFoundedEncoding σ) {n : Nat} {w : Word α n}
-  (h : ∀ {q1 i1 q2 i2}, m.next_except_halt w ⟨.other q1, i1⟩ ⟨.other q2, i2⟩ → wfe.rel (wfe.encode (q1, i1)) (wfe.encode (q2, i2))) :
+  (h : ∀ {q1 i1 q2 i2}, m.nextConfig w ⟨.other q1, i1⟩ ⟨.other q2, i2⟩ → wfe.rel (wfe.encode (q1, i1)) (wfe.encode (q2, i2))) :
     WellFounded (m.next_except_halt w) := by
   have wfe_cfgwf := wfe.cfgWf (n := n) |>.wf
   constructor
@@ -105,6 +103,6 @@ theorem next_except_halt_WF_of_encoding (m : TwoDFA α σ) (wfe : WellFoundedEnc
       apply ih (qb, bi)
       suffices wfe.cfgRel (qb, bi) a from this
       rw [wfe.CfgRel_def]
-      exact h hprev
+      exact h hprev.right.right
 
 end TwoDFA

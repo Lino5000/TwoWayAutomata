@@ -188,7 +188,7 @@ theorem as_tail {strt stp : Config σ n} (h : m.GoesLeftOf w i strt stp) : strt 
 
 theorem single_path {strt stp1 stp2 : Config σ n} (h1 : m.GoesLeftOf w i strt stp1) (h2 : m.GoesLeftOf w i strt stp2) :
     stp1 = stp2 ∨ m.GoesLeftOf w i stp1 stp2 ∨ m.GoesLeftOf w i stp2 stp1 := by
-  rcases em (stp1.idx ≤ i ∧ stp2.idx ≤ i) with hidx | hidx
+  by_cases hidx : stp1.idx ≤ i ∧ stp2.idx ≤ i
   · induction strt, h1 using head_induction_on hidx.left with
     | refl => right; left; exact h2
     | @head strt1 mid1 hd1 tl1 hlt1 ih1 =>
@@ -462,12 +462,12 @@ theorem prefix_left_of_go [Fintype σ] {strt stp : Config σ n} {j : Fin _} (hgo
                 suffices ⟨mid.state, j⟩ = mid by rw [←this]; exact hacc _ hmem
                 rw [←hmideq]
           else
-            rcases em (strt.idx < j) with hstrtlt | hstrtlt
-            case' inl =>
+            by_cases hstrtlt : strt.idx < j
+            case' pos =>
               have _term : mid.idx.rev < strt.idx.rev := by
                 rw [Fin.rev_lt_rev, hmideq]
                 exact hstrtlt
-            case' inr =>
+            case' neg =>
               have _term1 : mid.idx.rev = strt.idx.rev := by 
                 suffices strt.idx = j by rwa [Fin.rev_eq_iff, Fin.rev_rev, this]
                 cases Fin.lt_or_eq_of_le hstrt
