@@ -1,7 +1,8 @@
 name = "two_way_automata"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["TwoWayAutomata", "TwoWayAutomata.KozenExample", "TwoWayAutomata.NonTermExample",  "TwoWayAutomata.KthLastExample"]
+defaultTargets = ["TwoWayAutomata", "KozenExample", "NonTermExample",  "KthLastExample"]
+lintDriver = "batteries/runLinter"
 
 # precompileModules = true
 
@@ -15,3 +16,18 @@ scope = "leanprover-community"
 
 [[lean_lib]]
 name = "TwoWayAutomata"
+
+[[lean_exe]]
+name = "KozenExample"
+root = "TwoWayAutomata.KozenExample"
+needs = ["TwoWayAutomata"]
+
+[[lean_exe]]
+name = "NonTermExample"
+root = "TwoWayAutomata.NonTermExample"
+needs = ["TwoWayAutomata"]
+
+[[lean_exe]]
+name = "KthLastExample"
+root = "TwoWayAutomata.KthLastExample"
+needs = ["TwoWayAutomata"]

@@ -1,6 +1,8 @@
 import TwoWayAutomata.Kozen.Correctness
 import TwoWayAutomata.Kozen.Termination
 
+import TwoWayAutomata.Visualise.TwoDFA
+
 theorem Vector.count_tail {α : Type _} [BEq α] (n : Nat) (w : Vector α (n+1)) (a : α) : Vector.count a w = Vector.count a w.tail + if w[0] == a then 1 else 0 := by
   have eq_push_front : w = w.tail.insertIdx 0 w[0] := by
     suffices #[w[0]] = w.toArray.extract 0 1 by simp [insertIdx, this, Array.extract_eq_self_of_le]
@@ -407,3 +409,36 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
     apply example_never_diverges
 
 end example2DFA
+
+section Visualise
+
+instance : ToString ExampleState where
+  toString
+  | .q j => s! "q{j}"
+  | .p j => s! "p{j}"
+
+def state_val : ExampleState → Nat 
+  | .q j => j.val
+  | .p j => 10 + j.val
+
+instance : LinearOrder ExampleState := by
+  apply LinearOrder.lift' state_val
+  intro x y heq
+  cases x
+  <;> cases y
+  case q.q | p.p =>
+    simpa [state_val, Fin.val_inj] using heq
+  case q.p jq jp | p.q jp jq =>
+    exfalso
+    suffices jq.val ≠ 10 + jp.val by
+      simp only [state_val] at heq
+      rw [heq] at this
+      contradiction
+    clear heq
+    have := jp.is_lt
+    have := jq.is_lt
+    omega
+
+def main := IO.println example2DFA.asDotGraph
+
+end Visualise

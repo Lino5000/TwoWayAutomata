@@ -1,6 +1,8 @@
 import TwoWayAutomata.Kozen.Correctness
 import TwoWayAutomata.Kozen.Termination
 
+import TwoWayAutomata.Visualise.TwoDFA
+
 abbrev allOnes (x : List (Fin 2)) : Prop := x.all (· == 1)
 
 def exampleLanguage : Language (Fin 2) := { x | allOnes x}
@@ -164,3 +166,19 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
       rw [Set.mem_setOf]
     absurd hdiv
     apply example_halts_of_allOnes h
+
+section Visualise
+
+instance : ToString ExampleState where
+  toString | .q => "q"
+
+instance : LinearOrder ExampleState := by
+  apply LinearOrder.lift' (fun _ ↦ (0 : Nat))
+  intro x y _
+  cases x
+  cases y
+  rfl
+
+def main := IO.println example2DFA.asDotGraph
+
+end Visualise

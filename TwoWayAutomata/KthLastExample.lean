@@ -1,5 +1,7 @@
 import TwoWayAutomata
 
+import TwoWayAutomata.Visualise.TwoDFA
+
 section Helpers
 
 def List.kth_last {α : Type _} (l : List α) (k : Nat) [knz : NeZero k] : Option α :=
@@ -267,3 +269,31 @@ theorem machine_correct : (machine k a).language = language k a := by
     apply machine_halts _ _ hdiv
 
 end Example
+
+--- Output the diagram for (α := Fin 2) and (k := 3)
+section Visualise
+
+instance : ToString (ExState 3) where
+  toString
+  | .pass => "p"
+  | .count j => s! "c{j}"
+
+def state_val : ExState 3 → Nat
+  | .pass => 10
+  | .count j => j.val
+
+instance : LinearOrder (ExState 3) := by
+  apply LinearOrder.lift' state_val
+  intro x y heq
+  cases x
+  <;> cases y
+  all_goals simp only [state_val] at heq
+  case pass.pass => simp
+  case count.count => simpa [Fin.val_inj] using heq
+  case pass.count j | count.pass j =>
+    have : j.val < 3 := by simp [j.is_lt]
+    exfalso; omega
+
+def main := IO.println (machine 3 (0 : Fin 2)).asDotGraph
+
+end Visualise
