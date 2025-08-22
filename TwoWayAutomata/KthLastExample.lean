@@ -40,7 +40,7 @@ def machine : TwoDFA α (ExState k) where
     | .left, .count j => (.reject, .right)
     -- Makes some proofs easier to have this be explicit,
     -- This case is impossible to reach so we choose the returned state to make other proofs easier
-    | .right, .count j => (.other .pass, .left)
+    | .right, .count j => (.other <| .count j, .left)
     | .symbol sym, .count j => 
       if j = 0
         then
@@ -60,7 +60,9 @@ def cfg_meaning (n : Nat) : TwoDFA.ConfigMeaning n α (ExState k) where
   inWord 
     | .pass, _ => fun _ ↦ True      -- pass states tell us nothing
     | .count j, i => fun _ ↦        -- count states tell us about our position
-      i = n - (k - 1 - j.val) ∧ (k - 1 - j.val) ≤ n
+      if i = Fin.last _
+        then False  -- It is impossible to be in a count state at the right end-marker
+        else i = n - (k - 1 - j.val) ∧ (k - 1 - j.val) ≤ n
 
 theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a) where
   base w := by simp [machine, cfg_meaning]
@@ -86,7 +88,8 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
         simp only [hn, ↓reduceIte]
         constructor <;> omega
     case right.count j =>
-      simp [TwoDFA.ConfigMeaning.apply, Movement.apply, ←Fin.val_inj, cfg_meaning, SplitPredicate.apply]
+      have := w.eq_last_of_get_eq_right hget
+      simp [TwoDFA.ConfigMeaning.apply, Movement.apply, ←Fin.val_inj, cfg_meaning, SplitPredicate.apply, this] at ih
     case left.count j =>
       simp only [TwoDFA.ConfigMeaning.apply, cfg_meaning, Nat.pred_eq_sub_one, ne_eq, Fin.coe_pred]
       intro hklt; exfalso
@@ -106,7 +109,8 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
       <;> simp only [hj, ↓reduceIte, cfg_meaning, TwoDFA.ConfigMeaning.apply]
       -- j = 0
       · obtain ⟨ieq, hkles⟩ : i.val = n - (k - 1) ∧ k ≤ n + 1 := by
-          simpa [cfg_meaning, hzero, TwoDFA.ConfigMeaning.apply, SplitPredicate.apply, hj] using ih
+          have : ¬i = Fin.last _ := by simp [w.get_eq_right_iff_eq_last, hget]
+          simpa [cfg_meaning, hzero, TwoDFA.ConfigMeaning.apply, SplitPredicate.apply, hj, this] using ih
         clear ih
         have hkne : k ≠ n + 1 := by
           by_contra hkeq
@@ -134,7 +138,8 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
           simpa [hget]
       -- j ≠ 0
       · obtain ⟨i_val, k_le⟩ : i.val = n - (k - 1 - j.val) ∧ k ≤ n + j.val + 1 := by
-          simpa [cfg_meaning, TwoDFA.ConfigMeaning.apply, hzero, SplitPredicate.apply] using ih
+          have : ¬i = Fin.last _ := by simp [w.get_eq_right_iff_eq_last, hget]
+          simpa [cfg_meaning, TwoDFA.ConfigMeaning.apply, hzero, SplitPredicate.apply, this] using ih
         have hj' := hj
         rw [←Fin.val_inj, Fin.val_zero] at hj
         split
@@ -149,14 +154,15 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
         next hne => -- i - 1 ≠ 0
           simp only [SplitPredicate.apply, Movement.apply, Fin.coe_castLE, Fin.coe_pred, Nat.pred_eq_sub_one]
           rw [Fin.val_sub_one_of_ne_zero hj']
+          have := i.predCast_ne_last hzero
+          simp only [this, ↓reduceIte]
           constructor
           · rw [i_val]; omega
           · have : k - 1 - j.val ≤ n := by omega
-            have : k - 1 - j.val ≠ n := by
-              by_contra heq
-              suffices i = 0 by contradiction
-              simpa [heq] using i_val
-            omega
+            suffices k - 1 - j.val ≠ n by omega
+            by_contra heq
+            suffices i = 0 by contradiction
+            simpa [heq] using i_val
 
 def encoding : TwoDFA.WellFoundedEncoding (ExState k) where
   E {n} := Fin (k+1) × Fin (n+2)
@@ -166,11 +172,11 @@ def encoding : TwoDFA.WellFoundedEncoding (ExState k) where
   }
   encode 
     | (.pass, i) => (Fin.last _, i)
-    | (.count j, _) => (
+    | (.count j, i) => (
         j.castLT <| by
           apply j.is_lt.trans
           simp [Nat.sub_add_cancel knz.pos]
-        , 0)
+        , i.rev)
 
 theorem machine_halts {w : List α} : ¬(machine k a).diverges w.toWord := by
   apply TwoDFA.halts_of_next_except_halt_WF
@@ -201,8 +207,16 @@ theorem machine_halts {w : List α} : ¬(machine k a).diverges w.toWord := by
       simpa [Fin.lt_iff_val_lt_val] using knz.pos
   | .count j1, .count j2 =>
     cases hget : w.toWord.get i1
-    case left | right =>
+    case left =>
       simp [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, hget] at hnext
+    case right =>
+      obtain ⟨jeq, happly⟩ : j1 = j2 ∧ Movement.left.apply i1 ?_ = i2 := by
+        simpa [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, hget] using hnext
+      rw [jeq]
+      apply Prod.Lex.right
+      rw [Fin.rev_lt_rev, ←happly, Fin.lt_iff_val_lt_val]
+      have := w.toWord.eq_last_of_get_eq_right hget
+      simp [Movement.apply, this]
     case symbol sym =>
       by_cases hj1 : j1 = 0
       case pos =>
@@ -225,9 +239,9 @@ theorem machine_halts {w : List α} : ¬(machine k a).diverges w.toWord := by
       <;> by_cases hsym : sym = a
       <;> simp [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, hget, hj, hsym] at hnext
     case right =>
-      have : Movement.left.apply i1 ?_ = i2 := by
-        simpa [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, hget] using hnext
-      sorry
+      have : i1 = Fin.last _ := Word.eq_last_of_get_eq_right hget
+      -- We get a different contradiction here, but a contradiction none-the-less
+      simp [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, hget, this] at hnext
 
 theorem machine_correct : (machine k a).language = language k a := by
   apply TwoDFA.language_eq_of_inductive _ _ _ (meaning_inductive k a)
@@ -248,9 +262,8 @@ theorem machine_correct : (machine k a).language = language k a := by
     obtain ⟨hkle, hget⟩ := h
     simp [List.kth_last, hkle, hget]
   case hdiv =>
-    intro w hdiv
-    by_contra hlang
-    have := machine_halts _ _ hlang
-    contradiction
+    intro _ hdiv
+    by_contra
+    apply machine_halts _ _ hdiv
 
 end Example

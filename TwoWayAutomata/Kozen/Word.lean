@@ -226,6 +226,9 @@ theorem Fin.predCast_lt {n : Nat} (i : Fin (n+1)) (h : i ≠ 0) : i.predCast h <
   rw [lt_iff_val_lt_val]
   simp [h, Nat.sub_one_lt]
 
+theorem Fin.predCast_ne_last {n : Nat} (i : Fin (n+1)) (h : i ≠ 0) : i.predCast h ≠ Fin.last _ :=
+  Fin.ne_last_of_lt <| i.predCast_lt h
+
 theorem split_pred_idx_eq {n : Nat} (i : Fin (n+2)) (hi : 1 < i) : min (↑((i.predCast <| Fin.ne_zero_of_lt hi).pred <| Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi))) n + 1 = min (↑(i.pred <| Fin.ne_zero_of_lt hi)) n := by
   have : ↑i - 1 ≤ n := by
     rw [←Nat.succ_le_succ_iff]
