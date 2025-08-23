@@ -44,8 +44,7 @@ theorem get_neq_right_of_neq_last {α : Type u} {n : Nat} {w : Word α n} {i : F
           simp [Fin.pred, Fin.subNat, Fin.last] at h3
           simp [Fin.last, Fin.ext_iff]
           rw [Nat.sub_one] at h3
-          suffices i = n.succ by simp only [this, Nat.succ_eq_add_one, Fin.natCast_eq_last,
-            Fin.val_last, Nat.add_left_inj]
+          suffices i = n.succ by simp only [this, Nat.succ_eq_add_one]
           cases h4 : i.val with
           | zero =>
             simp only [Nat.pred, h4] at h3
@@ -53,7 +52,7 @@ theorem get_neq_right_of_neq_last {α : Type u} {n : Nat} {w : Word α n} {i : F
             contradiction
           | succ k =>
             rw [h4, ← Nat.sub_one, Nat.add_sub_cancel_right] at h3
-            simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.val_last]
+            simp only [Nat.succ_eq_add_one]
             rw [h3]
         have : w.get i = .right := Word.get_eq_right_of_eq_last this
         contradiction
@@ -131,8 +130,8 @@ def Word.get_eq_symbol_of_internal {α : Type u} {n : Nat} (w : Word α n) {i : 
       have := int.right
       contradiction
     have : (i.pred int.left).castPred i_not_last = int.val := by
-      simp [Fin.castPred, int.val_eq_pred, Fin.ext_iff]
-    simp [Word.get, int.left, int.right, i_not_last, this] at h
+      simp [Fin.castPred, Fin.ext_iff]
+    simp [Word.get, int.left, i_not_last, this] at h
     exact h.symm
 
 def Word.internal_of_get_eq_symbol {α : Type u} {n : Nat} (w : Word α n) {i : Fin (n+2)} (h : ∃ a : α, w.get i = .symbol a) :
@@ -177,7 +176,7 @@ def Word.extract {α : Type u} {n : Nat} (w : Word α n) (start stop : Fin (n+2)
 
 
 theorem split_lens_add_to_n (n : Nat) (i : Fin (n+2)) (h : i ≠ 0) : min ↑(i.pred h) n + (n - ↑(i.pred h)) = n := by
-  simp only [h, ↓reduceDIte, Fin.coe_pred]
+  simp only [Fin.coe_pred]
   suffices i-1 ≤ n by simp [this]
   rw [Nat.sub_one, Nat.pred_le_iff]
   exact i.is_le
@@ -187,7 +186,7 @@ abbrev split_spec {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i
   Vector.cast (split_lens_add_to_n n i h) (l ++ r) = w.val
 
 theorem Word.split_meets_spec {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : split_spec w i h := by
-  simp [split_spec, split, h, Vector.cast]
+  simp [split_spec, split, Vector.cast]
 
 @[simp]
 theorem Word.split_append {α : Type u} {n : Nat} (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) :
@@ -201,7 +200,7 @@ theorem Word.split_one {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (
   rw [Prod.mk_inj]
   constructor
   · simp [←Vector.toArray_inj, hi]
-  · simp [Vector.cast_eq_cast, ←Vector.toArray_inj, Vector.toArray_extract, Vector.toArray_cast, hi]
+  · simp [←Vector.toArray_inj, Vector.toArray_extract, Vector.toArray_cast, hi]
 
 theorem Word.split_last {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2)) (hi : i = Fin.last _) :
     w.split i (by simp [hi]) = ((Vector.cast (by simp [hi]) w.val, ⟨#[], by simp [hi]⟩) : split_type α i (by simp [hi])) := by
@@ -232,7 +231,7 @@ theorem Fin.predCast_ne_last {n : Nat} (i : Fin (n+1)) (h : i ≠ 0) : i.predCas
 theorem split_pred_idx_eq {n : Nat} (i : Fin (n+2)) (hi : 1 < i) : min (↑((i.predCast <| Fin.ne_zero_of_lt hi).pred <| Fin.ne_zero_of_lt (Fin.predCast_lt_predCast 1 i (by simp) hi))) n + 1 = min (↑(i.pred <| Fin.ne_zero_of_lt hi)) n := by
   have : ↑i - 1 ≤ n := by
     rw [←Nat.succ_le_succ_iff]
-    simp [hi, i.is_le]
+    simp [i.is_le]
   simp only [Fin.coe_pred, Fin.coe_castLE, tsub_le_iff_right, Fin.is_le', inf_of_le_left, this]
   apply Nat.sub_add_cancel
   rw [←Nat.succ_le_succ_iff, Nat.succ_eq_add_one, Nat.succ_eq_add_one]
@@ -327,7 +326,7 @@ theorem Word.split_succ2 {n : Nat} {α : Type u} (w : Word α n) (i : Fin (n+2))
     rw [←Nat.add_one_le_add_one_iff, l1]
     exact i.is_le
   unfold Vector.cast
-  simp [split, getInternal_eq_getElem, Fin.internal.val, l1, l2]
+  simp [split, l1, l2]
 
 theorem split_2_idx_valid_of_internal {n : Nat} {i : Fin (n+2)} (h : i.internal) : 0 < n - ↑(i.pred h.left) := by
   simp only [Fin.coe_pred, Nat.sub_pos_iff_lt]
@@ -346,7 +345,7 @@ lemma Fin.internal.val_pred_lt {n : Nat} {i : Fin (n+1)} (int : i.succ.internal)
   simpa
 
 lemma List.toWord_val_getElem_eq_getElem {α : Type u} (w : List α) (i : Fin w.length) : w.toWord.val[i] = w[i.val] := by
-  have : w = w.toWord.val.toList := by simp [toWord]
+  have : w = w.toWord.val.toList := by simp
   conv =>
     rhs; pattern w
     rw [this]

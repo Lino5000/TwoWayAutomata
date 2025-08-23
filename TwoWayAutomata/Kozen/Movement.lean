@@ -50,7 +50,7 @@ theorem Movement.isValid_castLE {n m : Nat} (move : Movement) (i : Fin (n+2)) {v
     · simp only [reduceCtorEq, and_false, not_false_eq_true]
     · simp only [and_true]
       rw [Fin.ext_iff]
-      simp only [Fin.coe_castLE, Fin.val_last, ne_eq]
+      simp only [Fin.coe_castLE, Fin.val_last]
       rw [add_le_add_iff_right] at h
       apply Nat.ne_of_lt
       apply Nat.lt_of_lt_of_le
@@ -113,7 +113,7 @@ theorem Movement.opp_cancel_of_valid {n : Nat} (i : Fin (n+2)) (move : Movement)
   unfold Movement.apply
   unfold Movement.opp
   cases move
-  <;> simp only [Fin.ext_iff, Fin.coe_castLT, Fin.val_succ, Fin.coe_pred]
+  <;> simp only [Fin.ext_iff, Fin.coe_castLT, Fin.val_succ]
   · rw [Nat.add_comm]
     apply Nat.add_sub_cancel'
     cases h : i.val with

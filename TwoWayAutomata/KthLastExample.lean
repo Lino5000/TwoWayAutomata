@@ -91,7 +91,7 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
         constructor <;> omega
     case right.count j =>
       have := w.eq_last_of_get_eq_right hget
-      simp [TwoDFA.ConfigMeaning.apply, Movement.apply, ←Fin.val_inj, cfg_meaning, SplitPredicate.apply, this] at ih
+      simp [TwoDFA.ConfigMeaning.apply, ←Fin.val_inj, cfg_meaning, SplitPredicate.apply, this] at ih
     case left.count j =>
       simp only [TwoDFA.ConfigMeaning.apply, cfg_meaning, Nat.pred_eq_sub_one, ne_eq, Fin.coe_pred]
       intro hklt; exfalso
@@ -243,7 +243,7 @@ theorem machine_halts {w : List α} : ¬(machine k a).diverges w.toWord := by
     case right =>
       have : i1 = Fin.last _ := Word.eq_last_of_get_eq_right hget
       -- We get a different contradiction here, but a contradiction none-the-less
-      simp [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, hget, this] at hnext
+      simp [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, this] at hnext
 
 theorem machine_correct : (machine k a).language = language k a := by
   apply TwoDFA.language_eq_of_inductive _ _ _ (meaning_inductive k a)
@@ -251,7 +251,7 @@ theorem machine_correct : (machine k a).language = language k a := by
     intro w h
     unfold language
     rw [Set.mem_setOf]
-    simp only [machine, cfg_meaning, TwoDFA.ConfigMeaning.apply, ↓reduceDIte, Vector.get, List.getElem_toArray, Fin.coe_cast] at h
+    simp only [cfg_meaning, TwoDFA.ConfigMeaning.apply, Vector.get, List.getElem_toArray, Fin.coe_cast] at h
     by_contra hkth_last
     obtain ⟨hkle, _⟩ : ∃ hk : k ≤ w.length, _ := by simpa [List.kth_last] using hkth_last
     have := h hkle
@@ -260,7 +260,7 @@ theorem machine_correct : (machine k a).language = language k a := by
     intro w h
     unfold language
     rw [Set.mem_setOf]
-    simp only [machine, cfg_meaning, TwoDFA.ConfigMeaning.apply, ↓reduceDIte, Vector.get, List.getElem_toArray, Fin.coe_cast] at h
+    simp only [cfg_meaning, TwoDFA.ConfigMeaning.apply, Vector.get, List.getElem_toArray, Fin.coe_cast] at h
     obtain ⟨hkle, hget⟩ := h
     simp [List.kth_last, hkle, hget]
   case hdiv =>
@@ -291,7 +291,7 @@ instance : LinearOrder (ExState 3) := by
   case pass.pass => simp
   case count.count => simpa [Fin.val_inj] using heq
   case pass.count j | count.pass j =>
-    have : j.val < 3 := by simp [j.is_lt]
+    have : j.val < 3 := by simp
     exfalso; omega
 
 def main := IO.println (machine 3 (0 : Fin 2)).asDotGraph

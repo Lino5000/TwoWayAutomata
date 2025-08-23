@@ -78,7 +78,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
         then simp [hpred, exampleConfigMeaning]
         else
           simp only [TwoDFA.ConfigMeaning.apply, hpred, ↓reduceDIte]
-          simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
+          simp only [SplitPredicate.apply, exampleConfigMeaning]
           have : 1 < i := by 
             simp [Fin.predCast, Fin.castLE] at hpred
             rw [Fin.lt_iff_val_lt_val, Fin.val_one]

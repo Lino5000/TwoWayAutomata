@@ -1,3 +1,4 @@
+import Mathlib.Data.Finset.Sort
 import TwoWayAutomata.Kozen.Basics
 
 variable {α σ : Type*}
@@ -49,37 +50,11 @@ def default_state_disp [ToString σ] : State σ → String
   | .reject => "✗"
   | .other q => toString q
 
-
-/--
-Finset.toList is noncomputable because at it's core it uses the axiom of choice
-to select a representative from the correct equivalence class under the
-permutation relation on lists without duplicates.
-
-By instead requiring a linear order as `≤`, we can extract a
-'canonical' representative by sorting the underlying list.
---/
-def Finset.toList_computable [ord : LinearOrder σ] (s : Finset σ) : List σ := by
-  apply Quot.lift (List.mergeSort) ?_ s.val
-  simp only
-  intro l1 l2 hrel
-  apply List.Perm.eq_of_sorted
-  · intro a b _ _
-    exact le_antisymm
-  · have := l1.sorted_mergeSort (le := (· ≤ ·))
-    simp only [decide_eq_true_eq, Bool.or_eq_true] at this
-    exact this ord.le_trans ord.le_total
-  · have := l2.sorted_mergeSort (le := (· ≤ ·))
-    simp only [decide_eq_true_eq, Bool.or_eq_true] at this
-    exact this ord.le_trans ord.le_total
-  · have hperm : l1.Perm l2 := by simpa only [List.isSetoid] using hrel
-    have l1perm : (l1.mergeSort).Perm l1 := l1.mergeSort_perm (· ≤ ·)
-    have l2perm : (l2.mergeSort).Perm l2 := l2.mergeSort_perm (· ≤ ·)
-    apply l1perm.trans
-    exact hperm.trans l2perm.symm
-
 /--
 Note that although there needs to be a linear order on both the state and alphabet types, they do not need to be meaningful in any way.
 The only need for these orders is to be able to extract a List of all elements of these finite types.
+An easy way to implement such an order is with an injective map into the naturals (or a list of naturals) and the `LinearOrder.lift'` function from Mathlib.
 --/
-def TwoDFA.asDotGraph [ToString α] [Fintype α] [LinearOrder α] [ToString σ] [Fintype σ] [LinearOrder σ] (m : TwoDFA α σ) (header := "2DFA") : String :=
-  m.asDotGraph_explicit (header := header) default_sym_disp default_state_disp (Finset.toList_computable Finset.univ) (Finset.toList_computable Finset.univ)
+def TwoDFA.asDotGraph [ToString α] [Fintype α] [symord : LinearOrder α] [ToString σ] [Fintype σ] [stateord : LinearOrder σ]
+    (m : TwoDFA α σ) (header := "2DFA") : String :=
+  m.asDotGraph_explicit (header := header) default_sym_disp default_state_disp (Finset.univ.sort stateord.le) (Finset.univ.sort symord.le)

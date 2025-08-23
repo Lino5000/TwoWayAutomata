@@ -30,38 +30,38 @@ theorem reject_at_rightEnd {α σ : Type*} (m : TwoDFA α σ) : m.step .right .r
 theorem config_accept_at_leftEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
     m.nextConfig w ⟨.accept, 0⟩ ⟨.accept, 1⟩ := by
   rw [←stepConfig_gives_nextConfig]
-  simp only [stepConfig, step, Word.get_eq_left_of_eq_zero, Config.mk.injEq, true_and]
+  simp only [stepConfig, Word.get_eq_left_of_eq_zero, Config.mk.injEq, true_and]
   simp [Movement.apply, ←Fin.val_inj]
 
 theorem config_accept_not_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) (idx : Fin (n+2)) (h : idx ≠ Fin.last _) :
     m.nextConfig w ⟨.accept, idx⟩ ⟨.accept, idx.succCast h⟩ := by
   rw [←stepConfig_gives_nextConfig]
-  simp only [stepConfig, step, w.get_neq_right_of_neq_last h, imp_self, Config.mk.injEq, true_and]
-  simp [Movement.apply, ←Fin.val_inj]
+  simp only [stepConfig, w.get_neq_right_of_neq_last h, imp_self, Config.mk.injEq, true_and]
+  simp [Movement.apply]
 
 theorem config_accept_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
     m.nextConfig w ⟨.accept, Fin.last _⟩ ⟨.accept, (Fin.last _).predCast <| by simp⟩ := by
   rw [←stepConfig_gives_nextConfig]
-  simp only [stepConfig, step, Word.get_eq_right_of_eq_last, Config.mk.injEq, true_and]
-  simp [Movement.apply, ←Fin.val_inj]
+  simp only [stepConfig, Word.get_eq_right_of_eq_last, Config.mk.injEq, true_and]
+  simp [Movement.apply]
 
 theorem config_reject_at_leftEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
     m.nextConfig w ⟨.reject, 0⟩ ⟨.reject, 1⟩ := by
   rw [←stepConfig_gives_nextConfig]
-  simp only [stepConfig, step, Word.get_eq_left_of_eq_zero, Config.mk.injEq, true_and]
+  simp only [stepConfig, Word.get_eq_left_of_eq_zero, Config.mk.injEq, true_and]
   simp [Movement.apply, ←Fin.val_inj]
 
 theorem config_reject_not_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) (idx : Fin (n+2)) (h : idx ≠ Fin.last _) :
     m.nextConfig w ⟨.reject, idx⟩ ⟨.reject, idx.succCast h⟩ := by
   rw [←stepConfig_gives_nextConfig]
-  simp only [stepConfig, step, w.get_neq_right_of_neq_last h, imp_self, Config.mk.injEq, true_and]
-  simp [Movement.apply, ←Fin.val_inj]
+  simp only [stepConfig, w.get_neq_right_of_neq_last h, imp_self, Config.mk.injEq, true_and]
+  simp [Movement.apply]
 
 theorem config_reject_at_rightEnd {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) :
     m.nextConfig w ⟨.reject, Fin.last _⟩ ⟨.reject, (Fin.last _).predCast <| by simp⟩ := by
   rw [←stepConfig_gives_nextConfig]
-  simp only [stepConfig, step, Word.get_eq_right_of_eq_last, Config.mk.injEq, true_and]
-  simp [Movement.apply, ←Fin.val_inj]
+  simp only [stepConfig, Word.get_eq_right_of_eq_last, Config.mk.injEq, true_and]
+  simp [Movement.apply]
 
 @[simp]
 theorem nextConfig.irrefl {α σ : Type*} {n : Nat} (m : TwoDFA α σ) (w : Word α n) (c : Config σ n) : ¬m.nextConfig w c c := by

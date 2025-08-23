@@ -106,8 +106,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       have : w.get 0 = .left := by rw [←idx_zero]; exact hget
       have right_valid : Movement.right.isValid (n := n) 0 := ⟨by simp, by simp⟩
       have right_apply : Movement.right.apply 0 right_valid = 1 := by unfold Movement.apply; rw [←Fin.val_inj]; simp
-      simp [TwoDFA.ConfigMeaning.apply, TwoDFA.stepConfig, example2DFA, this, exampleStep, right_apply,
-            exampleConfigMeaning, SplitPredicate.apply, Word.split_append, hind]
+      simp [TwoDFA.ConfigMeaning.apply, TwoDFA.stepConfig, example2DFA, exampleStep, right_apply, exampleConfigMeaning, hind]
     | .q j, .right =>
       cases fin3_lt_3 j; case' inr => rename j = _ ∨ _ => hj'; cases hj'
       all_goals
@@ -121,8 +120,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           unfold Movement.apply
           simp only
           rw [←Fin.val_inj]
-          simp only [Fin.coe_castLE, Fin.coe_pred, Fin.val_last, add_tsub_cancel_right,
-            Fin.ofNat_eq_cast, Fin.val_natCast]
+          simp only [Fin.coe_castLE, Fin.coe_pred, Fin.val_last, add_tsub_cancel_right, Fin.val_natCast]
           symm; rw [Nat.mod_eq_iff_lt]
           · exact Nat.lt_succ_of_lt <| Nat.lt_succ_self n
           · simp
@@ -136,7 +134,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           then
             have hn' : n = 0 := by simpa [←Fin.val_inj, Nat.mod_eq_of_lt] using hn
             have w_empty : w.val = ⟨#[], by simp [hn']⟩ := w.val.eq_empty_of_size_eq_zero hn'
-            simp [exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, hn, ↓reduceDIte, Fin.val_zero, w_empty]
+            simp [exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, hn, ↓reduceDIte, w_empty]
           else
             simp only [exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, hn, ↓reduceDIte, Fin.val_zero, SplitPredicate.apply]
             have n_mod_n_plus_2 : n % (n + 2) = n := Nat.mod_eq_of_lt <| by simp
@@ -150,14 +148,14 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
             simp [hind]
       all_goals  -- j = 1 ∨ j = 2
         by_cases hn : (@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n) = 0
-        <;> simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, hn, hind]
+        <;> simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, hind]
     | .p j, .right =>
       unfold get_res at hget
       have idx_last := Word.eq_last_of_get_eq_right hget
       rw [idx_last]
       rw [idx_last] at hget
       have split_last_len : n - ↑((Fin.last (n + 1)).pred <| by simp) - 1 = 0 := by simp
-      have split_last_tail_empty : (w.split (Fin.last _) <| by simp).2.tail = ⟨#[], by simp [split_last_len]⟩ := by simp [Word.split]
+      have split_last_tail_empty : (w.split (Fin.last _) <| by simp).2.tail = ⟨#[], by simp⟩ := by simp [Word.split]
       conv at hind =>
         rw [idx_last]
         simp only [TwoDFA.ConfigMeaning.apply, Fin.last_eq_zero_iff, Nat.add_eq_zero, one_ne_zero,
@@ -183,7 +181,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
         else
           have hn2 : (@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n) ≠ 0 := by
             rwa [Fin.ne_iff_vne, Fin.val_natCast, Fin.val_zero, ←n_mod_n_plus_2]
-          simp only [TwoDFA.ConfigMeaning.apply, hn2, ↓reduceDIte, exampleConfigMeaning, Nat.mod_two_not_eq_zero, SplitPredicate.apply]
+          simp only [TwoDFA.ConfigMeaning.apply, hn2, ↓reduceDIte, exampleConfigMeaning, SplitPredicate.apply]
           rw [Word.split_append, Vector.count_cast]
           have : n = n % (n + 1 + 1) := n_mod_n_plus_2
           have split_n_tail_size : 0 = n - ↑((@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n).pred hn2) - 1 := by

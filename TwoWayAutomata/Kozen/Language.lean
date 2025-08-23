@@ -36,7 +36,6 @@ theorem trans {start mid stp : Config σ n} (ha : m.GoesTo x start mid) (hb : m.
 theorem single {start stp : Config σ n} (hstep : m.nextConfig x start stp) : m.GoesTo x start stp :=
   tail refl hstep
 
-@[match_pattern]
 theorem head {start mid stp : Config σ n} (hstep : m.nextConfig x start mid) (htail : m.GoesTo x mid stp) :
     m.GoesTo x start stp := trans (single hstep) htail
 

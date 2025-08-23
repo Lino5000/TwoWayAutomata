@@ -184,7 +184,7 @@ theorem as_head {strt stp : Config σ n} (h : m.GoesLeftOf w i strt stp) : strt 
 theorem as_tail {strt stp : Config σ n} (h : m.GoesLeftOf w i strt stp) : strt = stp ∨ ∃ next, m.GoesLeftOf w i strt next ∧ m.nextConfig w next stp := by
   cases h with
   | refl => left; rfl
-  | @tail nxt _ _ hd tl => right; use nxt, by simp [hd, tl]
+  | @tail nxt _ _ hd tl => right; use nxt, by simp [hd]
 
 theorem single_path {strt stp1 stp2 : Config σ n} (h1 : m.GoesLeftOf w i strt stp1) (h2 : m.GoesLeftOf w i strt stp2) :
     stp1 = stp2 ∨ m.GoesLeftOf w i stp1 stp2 ∨ m.GoesLeftOf w i stp2 stp1 := by
@@ -700,7 +700,7 @@ lemma table_for_take_step_right_go_some {m : TwoDFA α σ} {w : List α} {t : Ba
   unfold step_right.go at hstep
   split at hstep
   case h_1 hstep' =>
-    simp only [Option.some.injEq, Prod.mk.injEq, List.nil_eq] at hstep
+    simp only [Option.some.injEq, Prod.mk.injEq] at hstep
     rw [hstep.left, ←Word.toWord_get_internal w i hint] at hstep'
     apply GoesLeftOf.single
     · simp
@@ -1170,7 +1170,7 @@ lemma step_right_go_nodup {m : TwoDFA α σ} {w : List α} {i : Fin (w.length + 
     simp only [Option.some.injEq, Prod.mk.injEq] at hstepright
     rwa [←hstepright.right, List.nodup_reverse]
   next p' heq =>
-    simp only [Fin.getElem_fin, Option.bind_eq_bind, Option.bind_eq_some_iff, Option.dite_none_left_eq_some, not_or] at hstepright
+    simp only [Fin.getElem_fin, Option.bind_eq_bind, Option.bind_eq_some_iff, Option.dite_none_left_eq_some] at hstepright
     obtain ⟨p'', hmap, hmem, hrec⟩ := hstepright
     apply step_right_go_nodup hi hrec
   termination_by Fintype.card (State σ) - acc.length
@@ -1410,7 +1410,7 @@ where
 
 theorem step_right_go_from_parts {m : TwoDFA α σ} {w : List α} {t : BackTable σ} {i : Fin (w.length + 1)} (hi : i.val < w.length) (p q q' q'' : State σ)
   (qs : List (State σ)) (hdupqs : (q' :: q'' :: qs).Nodup)
-  (hend : m.nextConfig w.toWord ⟨(q' :: q'' :: qs)[(q' :: q'' :: qs).length.pred]'(by simp [Nat.pos_of_ne_zero]), i.succ⟩ ⟨q, i.succ + 1⟩)
+  (hend : m.nextConfig w.toWord ⟨(q' :: q'' :: qs)[(q' :: q'' :: qs).length.pred]'(by simp), i.succ⟩ ⟨q, i.succ + 1⟩)
   (hsteps : ∀ j, ∀ hj : j < (q' :: q'' :: qs).length.pred, ∃ p',
             m.nextConfig w.toWord ⟨(q' :: q'' :: qs)[j]'(Nat.lt_of_lt_pred hj), i.succ⟩ ⟨p', i.castSucc⟩ ∧
             t.map p' = some ((q' :: q'' :: qs)[j.succ]'(Nat.succ_lt_of_lt_pred hj)))
@@ -1444,12 +1444,12 @@ theorem step_right_go_from_parts {m : TwoDFA α σ} {w : List α} {t : BackTable
         · simp [Movement.apply, ←Fin.val_inj, Fin.val_add_one_of_lt <| Fin.lt_last_iff_ne_last.mpr hint.right]
         · constructor <;> simp [hint.right]
       next p'' hstep =>
-        simp only [List.not_mem_nil, ↓reduceDIte, Option.bind_eq_bind, Option.bind_eq_some_iff]
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff]
         exists (q'' :: qs)[acc.length+1]
         constructor
         · obtain ⟨p', hnext, hmap⟩ := hsteps (acc.length+1) (by simp [hlen])
           rw [hget] at hnext
-          simp only [List.getElem_cons_zero, Nat.succ_eq_add_one, zero_add, List.getElem_cons_succ] at hnext hmap
+          simp only [Nat.succ_eq_add_one, List.getElem_cons_succ] at hnext hmap
           suffices p'' = p' by rwa [this]
           suffices m.nextConfig w.toWord ⟨p, i.succ⟩ ⟨p'', i.castSucc⟩ by simpa using nextConfig_right_unique this hnext
           left
@@ -1813,7 +1813,7 @@ theorem table_for_accepting_go {m : TwoDFA α σ} (t : BackTable σ) (w : List �
     simp only [Movement.apply, Fin.predCast, Fin.castLE, Fin.coe_pred, Fin.val_last, add_tsub_cancel_right, Fin.val_natCast]
     have : w.length < w.length + 2 := by trans <;> apply Nat.lt_add_one
     symm
-    simp [Nat.mod_eq_iff_lt, this]
+    simp [this]
   · trans
     · exact hind p' q' hq'
     · if hmem : q' ∈ acc
