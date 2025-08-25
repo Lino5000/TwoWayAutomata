@@ -12,7 +12,7 @@ variable {α σ : Type*}
 
 def DFA.asDotGraph_explicit
   (m : DFA α σ)
-  (header := "2DFA")
+  (header := "DFA")
   (sym_disp : α → String)
   (state_disp : σ → String)
   (inc_states : List σ)
@@ -21,12 +21,12 @@ def DFA.asDotGraph_explicit
   String := Id.run do
     let mut lines := #[s!"digraph \"{header}\" " ++ "{"]
     -- First add the nodes for states
-    for q in inc_states do
+    for (q, i) in inc_states.zipIdx do
       if q ∈ m.accept
         then
-          lines := lines.push s!"  \"{state_disp q}\" [peripheries=2];"
+          lines := lines.push s!"  \"{state_disp q}\" [peripheries=2, label=\"T{i}\"];"
         else
-          lines := lines.push s!"  \"{state_disp q}\" [];"
+          lines := lines.push s!"  \"{state_disp q}\" [label=\"T{i}\"];"
 
     -- Highlight start node
     lines := lines.push s!"  \"{state_disp m.start}\" [style=\"filled\", fillcolor=\"#EEEEBB\", color=\"#CCCC00\", penwidth=2.0];"
@@ -44,17 +44,65 @@ def DFA.asDotGraph_explicit
     lines := lines.push "}"
     return "\n".intercalate lines.toList
 
+set_option linter.unusedVariables false -- linter complains about hfrontnonempty because it's only used in the termination proof?
+def DFA.reachable.aux [Fintype σ] [DecidableEq σ] (m : DFA α σ) (inc_symbols : List α) (visited : List σ) (frontier : List σ)
+  (hvisit : visited.Nodup) (hfrontdup : frontier.Nodup) (hfrontnonempty : frontier ≠ [])
+  (hdisjoint : visited.Disjoint frontier) :
+    List σ :=
+  let visited' := visited ++ frontier
+  let frontier' := frontier.flatMap go |>.dedup.filter (· ∉ visited')
+  if hnil : frontier' = []
+    then visited'
+    else by
+      have hvisit' : visited'.Nodup := by
+        rw [List.nodup_append']
+        constructorm* _ ∧ _ <;> assumption
+      apply aux m inc_symbols visited' frontier'
+      · exact hvisit'
+      · apply List.Nodup.filter
+        apply List.nodup_dedup
+      · exact hnil
+      · intro a _ hfiltered
+        suffices a ∉ visited' by contradiction
+        rw [List.mem_filter] at hfiltered
+        simpa using hfiltered.right
+  termination_by Fintype.card σ - visited.length
+  decreasing_by
+    rw [List.length_append]
+    have : frontier.length ≠ 0 := by rwa [ne_eq, ←List.length_eq_zero_iff] at hfrontnonempty
+    suffices visited.length + frontier.length ≤ Fintype.card σ by omega
+    simpa [visited'] using hvisit'.length_le_card
+  where
+    go (q : σ) : List σ := inc_symbols.map (m.step q)
+set_option linter.unusedVariables true
+
+def DFA.reachable [Fintype σ] [DecidableEq σ] (m : DFA α σ) (inc_symbols : List α) : List σ := 
+  DFA.reachable.aux m inc_symbols [] [m.start] List.nodup_nil (List.nodup_singleton _) (by simp) (List.disjoint_nil_left _)
+
 section ConversionResult
 
 /--
 Note that although there needs to be a linear order on both the state and alphabet types, they do not need to be meaningful in any way.
 The only need for these orders is to be able to extract a List of all elements of these finite types.
 An easy way to implement such an order is with an injective map into the naturals (or a list of naturals) and the `LinearOrder.lift'` function from Mathlib.
+All of the examples do this implicitly by providing and encoding of the type into the Naturals.
 --/
-def DFA.asDotGraph [ToString α] [Fintype α] [stateord : LinearOrder α]
-    [ToString σ] [Fintype σ] [symord : LinearOrder σ]
-    (m : DFA α σ) [dec_acc : DecidablePred (· ∈ m.accept)] (header := "2DFA") : String :=
-  m.asDotGraph_explicit (header := header) toString toString (Finset.univ.sort symord.le) (Finset.univ.sort stateord.le)
+def DFA.asDotGraph [ToString α] [Fintype α] [symord : LinearOrder α]
+    [ToString σ] [Fintype σ] [stateord : LinearOrder σ]
+    (m : DFA α σ) [dec_acc : DecidablePred (· ∈ m.accept)] (header := "DFA") : String :=
+  m.asDotGraph_explicit (header := header) toString toString (Finset.univ.sort stateord.le) (Finset.univ.sort symord.le)
+
+/--
+Unlike DFA.asDotGraph, this function does not require an order on the states,
+because it instead performs a breadth-first search of the DFA's transition
+graph to compute a list of states which are reachable from the start state, and
+then only includes those states in the output.
+--/
+def DFA.asPrunedDotGraph [ToString α] [Fintype α] [symord : LinearOrder α]
+    [ToString σ] [Fintype σ] [DecidableEq σ]
+    (m : DFA α σ) [dec_acc : DecidablePred (· ∈ m.accept)] (header := "DFA") : String :=
+  let symbols := Finset.univ.sort symord.le
+  m.asDotGraph_explicit (header := header) toString toString (m.reachable symbols) symbols
 
 instance [enc : Encodable σ] : LinearOrder σ := LinearOrder.lift' enc.encode enc.encode_injective
 

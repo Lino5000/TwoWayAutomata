@@ -1,7 +1,9 @@
 import TwoWayAutomata.Kozen.Correctness
+import TwoWayAutomata.Kozen.Conversion
 import TwoWayAutomata.Kozen.Termination
 
 import TwoWayAutomata.Visualise.TwoDFA
+import TwoWayAutomata.Visualise.DFA
 
 theorem Vector.count_tail {α : Type _} [BEq α] (n : Nat) (w : Vector α (n+1)) (a : α) : Vector.count a w = Vector.count a w.tail + if w[0] == a then 1 else 0 := by
   have eq_push_front : w = w.tail.insertIdx 0 w[0] := by
@@ -419,24 +421,26 @@ def state_val : ExampleState → Nat
   | .q j => j.val
   | .p j => 10 + j.val
 
-instance : LinearOrder ExampleState := by
-  apply LinearOrder.lift' state_val
-  intro x y heq
-  cases x
-  <;> cases y
-  case q.q | p.p =>
-    simpa [state_val, Fin.val_inj] using heq
-  case q.p jq jp | p.q jp jq =>
-    exfalso
-    suffices jq.val ≠ 10 + jp.val by
-      simp only [state_val] at heq
-      rw [heq] at this
-      contradiction
-    clear heq
-    have := jp.is_lt
-    have := jq.is_lt
+instance : Encodable ExampleState where
+  encode 
+  | .q j => j.val
+  | .p j => 10 + j.val
+  decode n :=
+    if n < 3
+      then some <| .q <| Fin.ofNat 3 n
+      else if 10 ≤ n ∧ n < 12
+        then some <| .p <| Fin.ofNat 2 (n-10)
+        else none
+  encodek 
+  | .q j => by simp
+  | .p j => by
+    have cond : ¬ (10 + j.val < 3) := by omega
+    suffices 10 + j.val < 12 by simpa [cond]
+    have := j.is_lt
     omega
 
-def main := IO.println example2DFA.asDotGraph
+def main := do
+  /- IO.println example2DFA.asDotGraph -/
+  IO.println example2DFA.to_one_way.asPrunedDotGraph
 
 end Visualise

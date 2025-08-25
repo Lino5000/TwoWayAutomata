@@ -1,6 +1,7 @@
 import TwoWayAutomata
 
 import TwoWayAutomata.Visualise.TwoDFA
+import TwoWayAutomata.Visualise.DFA
 
 section Helpers
 
@@ -273,27 +274,31 @@ end Example
 --- Output the diagram for (α := Fin 2) and (k := 3)
 section Visualise
 
-instance : ToString (ExState 3) where
+instance (k : Nat) : ToString (ExState k) where
   toString
   | .pass => "p"
   | .count j => s! "c{j}"
 
-def state_val : ExState 3 → Nat
-  | .pass => 10
+instance (k : Nat) [knz : NeZero k] : Encodable (ExState k) where
+  encode
+  | .pass => k
   | .count j => j.val
+  decode n := 
+    if n < k
+      then some <| .count <| Fin.ofNat (k.pred + 1) n
+      else if n = k
+        then some .pass
+        else none
+  encodek
+  | .pass => by simp
+  | .count j => by
+    suffices j.val < k by simpa
+    suffices k.pred + 1 = k by simpa only [this] using j.is_lt
+    simp [Nat.sub_one_add_one knz.ne]
 
-instance : LinearOrder (ExState 3) := by
-  apply LinearOrder.lift' state_val
-  intro x y heq
-  cases x
-  <;> cases y
-  all_goals simp only [state_val] at heq
-  case pass.pass => simp
-  case count.count => simpa [Fin.val_inj] using heq
-  case pass.count j | count.pass j =>
-    have : j.val < 3 := by simp
-    exfalso; omega
-
-def main := IO.println (machine 3 (0 : Fin 2)).asDotGraph
+def main := do
+  /- IO.println (machine 3 (0 : Fin 2)).asDotGraph -/
+  /- IO.println (machine 2 (0 : Fin 2)).to_one_way.asDotGraph -/
+  IO.println (machine 3 (0 : Fin 2)).to_one_way.asPrunedDotGraph
 
 end Visualise

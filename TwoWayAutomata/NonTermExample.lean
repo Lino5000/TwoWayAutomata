@@ -1,6 +1,8 @@
 import TwoWayAutomata.Kozen.Correctness
+import TwoWayAutomata.Kozen.Conversion
 import TwoWayAutomata.Kozen.Termination
 
+import TwoWayAutomata.Visualise.DFA
 import TwoWayAutomata.Visualise.TwoDFA
 
 abbrev allOnes (x : List (Fin 2)) : Prop := x.all (· == 1)
@@ -172,13 +174,15 @@ section Visualise
 instance : ToString ExampleState where
   toString | .q => "q"
 
-instance : LinearOrder ExampleState := by
-  apply LinearOrder.lift' (fun _ ↦ (0 : Nat))
-  intro x y _
-  cases x
-  cases y
-  rfl
+instance : Encodable ExampleState where
+  encode | .q => 0
+  decode 
+  | 0 => some .q
+  | _ => none
+  encodek := by simp
 
-def main := IO.println example2DFA.asDotGraph
+def main : IO Unit := do
+  /- IO.println example2DFA.asDotGraph -/
+  IO.println example2DFA.to_one_way.asDotGraph
 
 end Visualise
