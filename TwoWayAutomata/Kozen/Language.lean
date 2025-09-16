@@ -330,6 +330,47 @@ theorem reject_all_cycles (hrej : m.rejects x) {c : Config σ n} (hreach : m.rea
   case' intro.inr => have h := hcyc.split h
   all_goals exact reject_preserve_state _ _ _ _ h
 
+theorem accept_cycle : m.CyclesAt x ⟨.accept, Fin.last _⟩ := by
+  let mid : Config σ n := ⟨.accept, Fin.ofNat _ n⟩
+  have n_lt_add_2 : n < n + 1 + 1 := by omega
+  refine ⟨mid, GoesTo.single ?_, ?_⟩
+  · simp only [Fin.ofNat_eq_cast, ←stepConfig_gives_nextConfig, stepConfig,
+               Word.get_eq_right_of_eq_last, Config.mk.injEq, true_and, mid]
+    simp [Movement.apply, ←Fin.val_inj, Nat.mod_eq_of_lt n_lt_add_2]
+  · simp only [Fin.ofNat_eq_cast, ← stepConfig_gives_nextConfig, stepConfig, Config.mk.injEq, mid]
+    constructor
+    · split
+      next => contradiction -- heq : .accept = .other _
+      all_goals rfl -- Other goals just want .accept = .accept
+    · cases hget : x.get (Fin.ofNat _ n) with
+      | right =>
+        absurd hget
+        simp [←Word.get_eq_right_iff_eq_last, ←Fin.val_inj, Nat.mod_eq_of_lt n_lt_add_2]
+      | left | symbol a =>
+        rw [Fin.ofNat_eq_cast] at hget
+        simp only [hget]
+        simp [Movement.apply, ←Fin.val_inj, n_lt_add_2]
+
+theorem reject_cycle : m.CyclesAt x ⟨.reject, Fin.last _⟩ := by
+  let mid : Config σ n := ⟨.reject, Fin.ofNat _ n⟩
+  have n_lt_add_2 : n < n + 1 + 1 := by omega
+  refine ⟨mid, GoesTo.single ?_, ?_⟩
+  · simp only [Fin.ofNat_eq_cast, ←stepConfig_gives_nextConfig, stepConfig,
+               Word.get_eq_right_of_eq_last, Config.mk.injEq, true_and, mid]
+    simp [Movement.apply, ←Fin.val_inj, Nat.mod_eq_of_lt n_lt_add_2]
+  · simp only [Fin.ofNat_eq_cast, ← stepConfig_gives_nextConfig, stepConfig, Config.mk.injEq, mid]
+    constructor
+    · split
+      next => contradiction -- heq : .accept = .other _
+      all_goals rfl -- Other goals just want .accept = .accept
+    · cases hget : x.get (Fin.ofNat _ n) with
+      | right =>
+        absurd hget
+        simp [←Word.get_eq_right_iff_eq_last, ←Fin.val_inj, Nat.mod_eq_of_lt n_lt_add_2]
+      | left | symbol a =>
+        rw [Fin.ofNat_eq_cast] at hget
+        simp only [hget]
+        simp [Movement.apply, ←Fin.val_inj, n_lt_add_2]
 
 section Runs
 

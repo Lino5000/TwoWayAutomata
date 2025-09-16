@@ -183,6 +183,6 @@ instance : Encodable ExampleState where
 
 def main : IO Unit := do
   /- IO.println example2DFA.asDotGraph -/
-  IO.println example2DFA.to_one_way.asDotGraph
+  IO.println example2DFA.to_accept_DFA.asDotGraph
 
 end Visualise

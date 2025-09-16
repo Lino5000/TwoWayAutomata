@@ -194,8 +194,16 @@ instance [Encodable σ] : Encodable (TwoDFA.BackTable σ) where
 instance [enc : Encodable (TwoDFA.BackTable σ)] : ToString (TwoDFA.BackTable σ) where
   toString t := s! "T{enc.encode t}"
 
-instance [DecidableEq σ] (m : TwoDFA α σ) : DecidablePred (· ∈ m.to_one_way.accept) := by
-  unfold TwoDFA.to_one_way TwoDFA.accepting_table
+instance [DecidableEq σ] (m : TwoDFA α σ) : DecidablePred (· ∈ m.to_accept_DFA.accept) := by
+  unfold TwoDFA.to_accept_DFA
+  infer_instance
+
+instance [DecidableEq σ] (m : TwoDFA α σ) : DecidablePred (· ∈ m.to_reject_DFA.accept) := by
+  unfold TwoDFA.to_reject_DFA
+  infer_instance
+
+instance [DecidableEq σ] (m : TwoDFA α σ) : DecidablePred (· ∈ m.to_diverge_DFA.accept) := by
+  unfold TwoDFA.to_diverge_DFA
   infer_instance
 
 end ConversionResult

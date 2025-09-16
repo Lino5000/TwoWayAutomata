@@ -30,11 +30,9 @@ structure TwoDFA (α σ : Type*) : Type _ where
   stay_in_bounds : ∀ p, (∃ q, stepOther .left p = (q, .right)) ∧ (∃ q, stepOther .right p = (q, .left))
 
 abbrev TwoDFA.step {α σ : Type*} (m : TwoDFA α σ) : TapeSymbol α → State σ → (State σ) × Movement
-  | .right, .accept => (.accept, .left)
-  | _, .accept => (.accept, .right)
-  | .right, .reject => (.reject, .left)
-  | _, .reject => (.reject, .right)
   | a, .other q => m.stepOther a q
+  | .right, acc_rej => (acc_rej, .left)
+  | _, acc_rej => (acc_rej, .right)
 
 theorem TwoDFA.in_bounds_left {α σ : Type*} (m : TwoDFA α σ) (p : State σ) :
     ∃ q, m.step .left p = (q, .right) := by

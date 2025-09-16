@@ -298,7 +298,7 @@ instance (k : Nat) [knz : NeZero k] : Encodable (ExState k) where
 
 def main := do
   /- IO.println (machine 3 (0 : Fin 2)).asDotGraph -/
-  /- IO.println (machine 2 (0 : Fin 2)).to_one_way.asDotGraph -/
-  IO.println (machine 3 (0 : Fin 2)).to_one_way.asPrunedDotGraph
+  /- IO.println (machine 2 (0 : Fin 2)).to_accept_DFA.asDotGraph -/
+  IO.println (machine 3 (0 : Fin 2)).to_accept_DFA.asPrunedDotGraph
 
 end Visualise
