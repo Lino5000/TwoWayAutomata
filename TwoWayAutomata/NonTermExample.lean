@@ -31,8 +31,12 @@ def example2DFA : TwoDFA (Fin 2) ExampleState where
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
   accept w := w.all (· == 1)
   reject w := w.any (· != 1)
-  atLeft | .q, _ => True
-  inWord | .q, _ => fun ⟨wl, _⟩ ↦ wl.all (· == 1)
+  other
+  | .q, i, w =>
+    if h : i = 0 then True
+    else
+      let ⟨wl, _⟩ := w.split i h 
+      wl.all (· == 1)
 
 theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) example2DFA where
   base := by simp [exampleConfigMeaning, example2DFA]
@@ -48,10 +52,11 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       simp only [Movement.apply, Fin.predCast, Fin.castLE, Fin.coe_pred, Fin.val_last, add_tsub_cancel_right]
       have last_ne_zero : Fin.last (n+1) ≠ 0 := by symm; simp
       conv at hind =>
-        simp only [TwoDFA.ConfigMeaning.apply, last_ne_zero, ↓reduceDIte]
-        simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Word.split_last, Vector.all_cast, Vector.any_cast]
+        simp only [TwoDFA.ConfigMeaning.apply, last_ne_zero, ↓reduceDIte,
+                   exampleConfigMeaning, Word.split_last, Vector.all_cast,
+                   Vector.any_cast]
       if hn : n = 0
-        then simp [TwoDFA.ConfigMeaning.apply, hn, exampleConfigMeaning]
+        then simp [hn, exampleConfigMeaning]
         else
           have : ⟨n, by simp⟩ ≠ (0 : Fin (n+2)) := by
             rw [←Fin.zero_eta, Fin.ne_iff_vne]
@@ -65,43 +70,39 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       simp only [Movement.apply, Fin.castLT, Fin.succ_zero_eq_one, Fin.coe_ofNat_eq_mod, Nat.one_mod, Fin.mk_one]
       conv at hind =>
         simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
-        simp only [SplitPredicate.apply, Word.split_append]
+        simp only [Word.split_append]
       simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, one_ne_zero, ↓reduceDIte]
-      simp [SplitPredicate.apply, Word.split_one]
+      simp [Word.split_one]
     | .q, .symbol 0 =>
       unfold get_res at hget
       have hint : i.internal := w.internal_of_get_eq_symbol ⟨_, hget⟩
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
       simp only [Movement.apply]
       conv at hind =>
-        simp only [TwoDFA.ConfigMeaning.apply, hint.left, ↓reduceDIte]
-        simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
-      if hpred : i.predCast hint.left = 0 
-        then simp [hpred, exampleConfigMeaning]
-        else
-          simp only [TwoDFA.ConfigMeaning.apply, hpred, ↓reduceDIte]
-          simp only [SplitPredicate.apply, exampleConfigMeaning]
-          have : 1 < i := by 
-            simp [Fin.predCast, Fin.castLE] at hpred
-            rw [Fin.lt_iff_val_lt_val, Fin.val_one]
-            exact Nat.lt_of_sub_ne_zero hpred
-          conv at hind =>
-            rw [w.split_pred _ this]
-            simp only [Vector.all_cast, Vector.all_push, Bool.and_eq_true]
-          exact hind.left
+        simp only [TwoDFA.ConfigMeaning.apply, hint.left, ↓reduceDIte,
+                   exampleConfigMeaning, Vector.all_cast, Vector.any_cast]
+      simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, dite_then_true]
+      intro hpred
+      have : 1 < i := by 
+        simp [Fin.predCast, Fin.castLE] at hpred
+        rw [Fin.lt_iff_val_lt_val, Fin.val_one]
+        exact Nat.lt_of_sub_ne_zero hpred
+      conv at hind =>
+        rw [w.split_pred _ this]
+        simp only [Vector.all_cast, Vector.all_push, Bool.and_eq_true]
+      simpa using hind.left
     | .q, .symbol 1 =>
       unfold get_res at hget
       have hint : i.internal := w.internal_of_get_eq_symbol ⟨_, hget⟩
       simp only [TwoDFA.stepConfig, example2DFA, hget, exampleStep]
       simp only [Movement.apply]
       conv at hind =>
-        simp only [TwoDFA.ConfigMeaning.apply, hint.left, ↓reduceDIte]
-        simp only [SplitPredicate.apply, exampleConfigMeaning, Word.split_append, Vector.all_cast, Vector.any_cast]
+        simp only [TwoDFA.ConfigMeaning.apply, hint.left, ↓reduceDIte,
+                   exampleConfigMeaning, Vector.all_cast, Vector.any_cast]
       have : i.succ.castLT hint.val_succ_lt ≠ 0 := by
         rw [←Fin.zero_eta, Fin.ne_iff_vne]
         simp
-      simp only [TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
-      simp only [SplitPredicate.apply, exampleConfigMeaning]
+      simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, this, ↓reduceDIte]
       rw [←w.split_succ _ hint.left hint.right]
       simp only [Vector.all_cast, Vector.all_push, Bool.and_eq_true]
       constructor
@@ -159,7 +160,7 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
     have : Fin.last (w.length + 1) ≠ 0 := by simp
     conv at h =>
       simp only [example2DFA, exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
-      simp only [SplitPredicate.apply, Word.split_append, Vector.all_cast, Vector.any_cast]
+      simp only [Vector.all_cast, Vector.any_cast]
     simpa using h
   case hdiv =>
     intro w hdiv h

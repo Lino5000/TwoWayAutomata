@@ -57,10 +57,7 @@ def machine : TwoDFA α (ExState k) where
 def cfg_meaning (n : Nat) : TwoDFA.ConfigMeaning n α (ExState k) where
   accept w := ∃ hk : k ≤ n, w.get ⟨n - k, by have := knz.ne; omega⟩ = a
   reject w := ∀ hk : k ≤ n, w.get ⟨n - k, by have := knz.ne; omega⟩ ≠ a
-  atLeft
-    | .pass, _ => True              -- pass states tell us nothing
-    | .count j, _ => n = k - 1 - j.val  -- if we reach the left end while counting, the string is too short
-  inWord 
+  other
     | .pass, _ => fun _ ↦ True      -- pass states tell us nothing
     | .count j, i => fun _ ↦        -- count states tell us about our position
       if i = Fin.last _
@@ -70,6 +67,7 @@ def cfg_meaning (n : Nat) : TwoDFA.ConfigMeaning n α (ExState k) where
 theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a) where
   base w := by simp [machine, cfg_meaning]
   ind w q i ih := by
+    have := knz.pos
     cases hget : w.get i
     case' left =>
       have hzero : i = 0 := w.eq_zero_of_get_eq_left hget
@@ -79,27 +77,21 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
       cases q
       <;> simp only [TwoDFA.stepConfig, hget, machine, Nat.pred_eq_sub_one]
     case symbol.pass | left.pass =>
-      simp [cfg_meaning, SplitPredicate.apply]
+      simp [cfg_meaning]
     case right.pass =>
       have hlast := w.eq_last_of_get_eq_right hget
-      by_cases hn : n = 0
-      · suffices if n = 0 then n = k - 1 - (k - 1) else n = n - (k - 1 - (k - 1)) ∧ k ≤ n + (k - 1) + 1 by
-          simpa [hlast, Fin.predCast, cfg_meaning, TwoDFA.ConfigMeaning.apply, SplitPredicate.apply, ←Fin.val_inj, Movement.apply]
-        simp [hn]
-      · suffices if n = 0 then n = k - 1 - (k - 1) else n = n - (k - 1 - (k - 1)) ∧ k ≤ n + (k - 1) + 1 by
-          simpa [hlast, Fin.predCast, cfg_meaning, TwoDFA.ConfigMeaning.apply, SplitPredicate.apply, ←Fin.val_inj, Movement.apply]
-        simp only [hn, ↓reduceIte]
-        constructor <;> omega
+      suffices k ≤ n + (k - 1) + 1 by
+        simpa [cfg_meaning, hlast, Movement.apply, Fin.predCast, ←Fin.val_inj]
+      omega
     case right.count j =>
       have := w.eq_last_of_get_eq_right hget
-      simp [TwoDFA.ConfigMeaning.apply, ←Fin.val_inj, cfg_meaning, SplitPredicate.apply, this] at ih
+      simp [TwoDFA.ConfigMeaning.apply, ←Fin.val_inj, cfg_meaning, this] at ih
     case left.count j =>
-      simp only [TwoDFA.ConfigMeaning.apply, cfg_meaning, Nat.pred_eq_sub_one, ne_eq, Fin.coe_pred]
+      simp only [TwoDFA.ConfigMeaning.apply, cfg_meaning, Nat.pred_eq_sub_one, ne_eq]
       intro hklt; exfalso
       apply Nat.not_le_of_gt ?hkgt hklt
-      have ih : n = k - 1 - j.val := by simpa [cfg_meaning, TwoDFA.ConfigMeaning.apply, hzero] using ih
-      have := knz.pos
-      omega
+      suffices 0 = n - (k - 1 - j.val) ∧ k ≤ n + j.val + 1 by omega
+      simpa [cfg_meaning, hzero] using ih
     case symbol.count sym j =>
       have hjlt : j.val < k := by 
         have : k = k.pred + 1 := by
@@ -113,7 +105,7 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
       -- j = 0
       · obtain ⟨ieq, hkles⟩ : i.val = n - (k - 1) ∧ k ≤ n + 1 := by
           have : ¬i = Fin.last _ := by simp [w.get_eq_right_iff_eq_last, hget]
-          simpa [cfg_meaning, hzero, TwoDFA.ConfigMeaning.apply, SplitPredicate.apply, hj, this] using ih
+          simpa [cfg_meaning, hzero, hj, this] using ih
         clear ih
         have hkne : k ≠ n + 1 := by
           by_contra hkeq
@@ -142,30 +134,19 @@ theorem meaning_inductive {n : Nat} : (cfg_meaning k a n).Inductive (machine k a
       -- j ≠ 0
       · obtain ⟨i_val, k_le⟩ : i.val = n - (k - 1 - j.val) ∧ k ≤ n + j.val + 1 := by
           have : ¬i = Fin.last _ := by simp [w.get_eq_right_iff_eq_last, hget]
-          simpa [cfg_meaning, TwoDFA.ConfigMeaning.apply, hzero, SplitPredicate.apply, this] using ih
+          simpa [cfg_meaning, hzero, this] using ih
         have hj' := hj
         rw [←Fin.val_inj, Fin.val_zero] at hj
-        split
-        next heq => -- i - 1 = 0
-          have _ : n - (k - 1 - j.val) - 1 = 0 := by
-            simpa [Movement.apply, ←Fin.val_inj, i_val] using heq
-          rw [Fin.val_sub_one_of_ne_zero hj']
-          have _ := knz.pos
-          obtain ⟨i_ne_zero, _⟩ := Movement.left.isValid_of_apply i 0 heq
-          simp only [and_true, Fin.ne_iff_vne, Fin.val_zero] at i_ne_zero
-          omega
-        next hne => -- i - 1 ≠ 0
-          simp only [SplitPredicate.apply, Movement.apply, Fin.coe_castLE, Fin.coe_pred, Nat.pred_eq_sub_one]
-          rw [Fin.val_sub_one_of_ne_zero hj']
-          have := i.predCast_ne_last hzero
-          simp only [this, ↓reduceIte]
-          constructor
-          · rw [i_val]; omega
-          · have : k - 1 - j.val ≤ n := by omega
-            suffices k - 1 - j.val ≠ n by omega
-            by_contra heq
-            suffices i = 0 by contradiction
-            simpa [heq] using i_val
+        simp [Movement.apply_left_ne_last]
+        simp only [Movement.apply, Fin.coe_castLE, Fin.coe_pred]
+        rw [Fin.val_sub_one_of_ne_zero hj']
+        constructor
+        · rw [i_val]; omega
+        · have : k - 1 - j.val ≤ n := by omega
+          suffices k - 1 - j.val ≠ n by omega
+          by_contra heq
+          suffices i = 0 by contradiction
+          simpa [heq] using i_val
 
 def encoding : TwoDFA.WellFoundedEncoding (ExState k) where
   E {n} := Fin (k+1) × Fin (n+2)

@@ -7,42 +7,24 @@ import TwoWayAutomata.Kozen.Word
 
 variable {n : Nat} {α σ : Type*}
 
-def SplitPredicate (n : Nat) (α : Type _) : Type _ :=
-  (i : Fin (n+2)) → {h : i ≠ 0} → (Vector α (min (↑(i.pred h)) n) × Vector α (n - ↑(i.pred h))) → Prop
-
-@[inline]
-def SplitPredicate.apply (sp : SplitPredicate n α) (w : Word α n) (i : Fin (n+2)) (h : i ≠ 0) : Prop :=
-  sp i (h := h) <| w.split i h
-
 namespace TwoDFA
 
--- TODO: remove SplitPredicate and just pass in the state, position, and the whole word
---       this removes the need to have both `atLeft` and `inWord`, and will
---       simplify proofs of `Inductive` when the condition does not utilise the
---       split word, which seems more common in the examples.
 structure ConfigMeaning (n : Nat) (α σ : Type*) : Type _ where
-  --- Meaning of being in the given state at the left end marker
-  atLeft : σ → Vector α n → Prop
-  --- Meaning of being in the given state at the given position in the input after the left endmarker
-  inWord : σ → SplitPredicate n α 
   --- Meaning of being in the accept state
   accept : Vector α n → Prop
   --- Meaning of being in the reject state
   reject : Vector α n → Prop
+  --- Meaning of being in some other state at the given position
+  other : σ → Fin (n+2) → Word α n → Prop
 
 namespace ConfigMeaning
 
-@[reducible]
+@[reducible, simp]
 def apply (cm : ConfigMeaning n α σ) (w : Word α n) (cfg : Config σ n) : Prop :=
   match cfg with
   | ⟨.accept, _⟩ => cm.accept w.val
   | ⟨.reject, _⟩ => cm.reject w.val
-  | ⟨.other q, i⟩ =>
-    if hcfg : i = 0
-      then
-        cm.atLeft q w.val
-      else
-        cm.inWord q |>.apply w i hcfg
+  | ⟨.other q, i⟩ => cm.other q i w
 
 structure Inductive (m : TwoDFA α σ) (cm : ConfigMeaning n α σ) : Prop where
   base : ∀ w, cm.apply w m.init

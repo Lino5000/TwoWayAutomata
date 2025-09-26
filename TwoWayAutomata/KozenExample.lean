@@ -71,13 +71,16 @@ def example2DFA : TwoDFA (Fin 2) ExampleState where
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
   accept word := (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = 0
   reject word := (word.count 0) % 3 ≠ 0 ∨ (word.count 1) % 2 = 1
-  atLeft
-    | .p j, word => (word.count 0) % 3 = 0 ∧ (word.count 1) % 2 = ↑j
-    | .q j, _    => 0 = ↑j
-  inWord
-    | .q j, _ => fun ⟨wleft, _⟩ ↦ wleft.count 0 % 3 = ↑j
-    | .p j, _ => fun ⟨wleft, wright⟩ ↦ (wleft ++ wright).count 0 % 3 = 0 ∧ wright.tail.count 1 % 2 = ↑j
-
+  other
+    | .q j, i, word =>
+      if h : i = 0
+        then 0 = j.val
+        else ((word.split i h).1.count 0) % 3 = j.val
+    | .p j, i, word =>
+      word.val.count 0 % 3 = 0 ∧ 
+        if h : i = 0
+          then word.val.count 1 % 2 = j.val
+          else (word.split i h).2.tail.count 1 % 2 = j.val
 
 theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) example2DFA where
   base := by simp [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, example2DFA]
@@ -95,7 +98,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       have hget' : w.get 0 = .left := by rw [←idx_zero]; exact hget
       have right_valid : Movement.right.isValid (n := n) 0 := by constructor <;> simp
       have right_apply : Movement.right.apply 0 right_valid = 1 := by rw [←Fin.val_inj]; simp [Movement.apply]
-      simpa [example2DFA, exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, TwoDFA.stepConfig, exampleStep, hget', right_apply, SplitPredicate.apply, Word.split_one]
+      simpa [example2DFA, exampleConfigMeaning, TwoDFA.stepConfig, exampleStep, hget', right_apply, Word.split_one]
     | .p j, .left => cases fin2_lt_2 j; all_goals
       rename j = _ => hj
       unfold get_res at hget
@@ -130,7 +133,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           simp [TwoDFA.stepConfig, example2DFA, exampleStep, hj, hget, left_apply]
         conv at hind =>
           rw [hj, idx_last]
-          simp [exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, SplitPredicate.apply, Word.split]
+          simp [exampleConfigMeaning, Word.split]
       case inl =>  -- j = 0
         if hn : (@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n) = 0
           then
@@ -138,7 +141,6 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
             have w_empty : w.val = ⟨#[], by simp [hn']⟩ := w.val.eq_empty_of_size_eq_zero hn'
             simp [exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, hn, ↓reduceDIte, w_empty]
           else
-            simp only [exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, hn, ↓reduceDIte, Fin.val_zero, SplitPredicate.apply]
             have n_mod_n_plus_2 : n % (n + 2) = n := Nat.mod_eq_of_lt <| by simp
             have hn' : n ≠ 0 := by simpa only [←ne_eq, Fin.ne_iff_vne, Fin.val_natCast, Fin.val_zero, n_mod_n_plus_2] using hn
             have n_mod_n_plus_2' : n % (n + 1 + 1) = n := by simp [n_mod_n_plus_2]
@@ -146,7 +148,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
               simp [n_mod_n_plus_2', Nat.sub_sub_self <| Nat.pos_of_ne_zero hn']
             have : (w.split (@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n) hn).2.tail = ⟨#[], by rw [hlen]; simp⟩ := by
               simp [Word.split, Vector.tail, n_mod_n_plus_2', Nat.sub_one_add_one hn']
-            rw [Word.split_append, Vector.count_cast, this]
+            simp only [exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, this, hn]
             simp [hind]
       all_goals  -- j = 1 ∨ j = 2
         by_cases hn : (@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n) = 0
@@ -161,10 +163,10 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       conv at hind =>
         rw [idx_last]
         simp only [TwoDFA.ConfigMeaning.apply, Fin.last_eq_zero_iff, Nat.add_eq_zero, one_ne_zero,
-          and_false, ↓reduceDIte, SplitPredicate.apply, exampleConfigMeaning, Fin.isValue, ne_eq,
+          and_false, ↓reduceDIte, exampleConfigMeaning, Fin.isValue, ne_eq,
           Fin.coe_pred, Vector.count_cast, not_and,
           Nat.mod_two_not_eq_zero, Fin.val_last, Nat.add_one_sub_one]
-        rw [Word.split_append, Vector.count_cast, split_last_tail_empty]
+        rw [split_last_tail_empty]
         simp only [Fin.isValue, Fin.coe_pred, Fin.val_last, Nat.add_one_sub_one, Vector.count_mk,
           List.count_toArray, List.nodup_nil, List.count_nil, Nat.zero_mod]
       have n_mod_n_plus_2 : n = n % (n + 2) := by symm; apply Nat.mod_eq_of_lt; simp
@@ -183,8 +185,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
         else
           have hn2 : (@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n) ≠ 0 := by
             rwa [Fin.ne_iff_vne, Fin.val_natCast, Fin.val_zero, ←n_mod_n_plus_2]
-          simp only [TwoDFA.ConfigMeaning.apply, hn2, ↓reduceDIte, exampleConfigMeaning, SplitPredicate.apply]
-          rw [Word.split_append, Vector.count_cast]
+          simp only [TwoDFA.ConfigMeaning.apply, hn2, ↓reduceDIte, exampleConfigMeaning]
           have : n = n % (n + 1 + 1) := n_mod_n_plus_2
           have split_n_tail_size : 0 = n - ↑((@Nat.cast _ (Fin.NatCast.instNatCast (n+2)) n).pred hn2) - 1 := by
             simp only [Fin.coe_pred, Fin.val_natCast, ← this]
@@ -209,12 +210,12 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           conv at hind =>
             rw [hj]
             simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, idx_int.left, ↓reduceDIte]
-            simp only [SplitPredicate.apply, Fin.val_zero, Fin.val_one, Fin.val_two]
+            simp only [Fin.val_zero, Fin.val_one, Fin.val_two]
           have move_right_valid : Movement.right.isValid idx := by constructor <;> simp [idx_int.right]
           have move_right : Movement.right.apply idx move_right_valid = idx.succCast idx_int.right := by simp [Movement.apply]
           have idx_succ_ne_zero : idx.succCast idx_int.right ≠ 0 := by rw [Fin.ne_iff_vne]; simp
           simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, idx_succ_ne_zero, ↓reduceDIte, move_right]
-          simp only [SplitPredicate.apply, Fin.val_zero, Fin.val_one, Fin.val_two]
+          simp only [Fin.val_zero, Fin.val_one, Fin.val_two]
           rw [←w.split_succ idx idx_int.left idx_int.right]
           simp only [Vector.count_cast, Vector.count_push]
           have : w.getInternal idx idx_int = a := by
@@ -238,8 +239,7 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           conv at hind =>
             rw [hj]
             simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, idx_int.left, ↓reduceDIte]
-            simp only [SplitPredicate.apply, Fin.val_zero, Fin.val_one]
-            rw [Word.split_append, Vector.count_cast]
+            simp only [Fin.val_zero, Fin.val_one]
           have move_left_valid : Movement.left.isValid idx := by constructor <;> simp [idx_int.left]
           have move_left : Movement.left.apply idx move_left_valid = idx.predCast idx_int.left := by simp [Movement.apply]
           simp only [TwoDFA.ConfigMeaning.apply, exampleConfigMeaning, Fin.val_zero, Fin.val_one, move_left]
@@ -270,8 +270,6 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
                     simp [ha]
             else
               simp only [↓reduceDIte, hidx]
-              simp only [SplitPredicate.apply]
-              rw [Word.split_append, Vector.count_cast]
               have one_lt_idx : 1 < idx := by
                 rw [←Fin.pred_lt_pred_iff]
                 · simp only [Fin.pred_one]
@@ -401,7 +399,7 @@ theorem exampleAcceptsLanguage : example2DFA.language = exampleLanguage := by
     have : Fin.last (w.length + 1) ≠ 0 := by simp
     conv at h =>
       simp only [example2DFA, exampleConfigMeaning, TwoDFA.ConfigMeaning.apply, this, ↓reduceDIte]
-      simp only [SplitPredicate.apply, Word.split_append, Vector.count_cast]
+      simp only [Word.split_append, Vector.count_cast]
     simpa [imp_iff_not_or, List.toWord] using h
   case hdiv =>
     intro _ hdiv
