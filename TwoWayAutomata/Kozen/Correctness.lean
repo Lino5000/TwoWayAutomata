@@ -16,6 +16,10 @@ def SplitPredicate.apply (sp : SplitPredicate n α) (w : Word α n) (i : Fin (n+
 
 namespace TwoDFA
 
+-- TODO: remove SplitPredicate and just pass in the state, position, and the whole word
+--       this removes the need to have both `atLeft` and `inWord`, and will
+--       simplify proofs of `Inductive` when the condition does not utilise the
+--       split word, which seems more common in the examples.
 structure ConfigMeaning (n : Nat) (α σ : Type*) : Type _ where
   --- Meaning of being in the given state at the left end marker
   atLeft : σ → Vector α n → Prop

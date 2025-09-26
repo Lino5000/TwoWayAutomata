@@ -12,28 +12,28 @@ def Config.castLE {σ : Type _} {n m : Nat} (h : n ≤ m) (c : Config σ n) : Co
 
 abbrev init {n : Nat} {α σ : Type*} (m : TwoDFA α σ) : Config σ n := ⟨m.start, 0⟩
 
-variable {n : Nat} {α σ : Type*} (m : TwoDFA α σ) (x : Word α n) 
+variable {n : Nat} {α σ : Type*} (m : TwoDFA α σ) (w : Word α n) 
 
 inductive nextConfig (c1 c2 : Config σ n) : Prop where
-  | stepLeft : m.step (x.get c1.idx) c1.state = (c2.state, .left) →
+  | stepLeft : m.step (w.get c1.idx) c1.state = (c2.state, .left) →
                (hvalid : Movement.left.isValid c1.idx) →
                (happly : Movement.left.apply c1.idx hvalid = c2.idx) →
              nextConfig c1 c2
-  | stepRight : m.step (x.get c1.idx) c1.state = (c2.state, .right) →
+  | stepRight : m.step (w.get c1.idx) c1.state = (c2.state, .right) →
                 (hvalid : Movement.right.isValid c1.idx) →
                 (happly : Movement.right.apply c1.idx hvalid = c2.idx) →
               nextConfig c1 c2
 
 def stepConfig : Config σ n → Config σ n
-  | ⟨ state, idx ⟩ => match hstep : m.step (x.get idx) state with
+  | ⟨ state, idx ⟩ => match hstep : m.step (w.get idx) state with
                       | ⟨ nextState, move ⟩ =>
                         let hvalid : move.isValid idx := m.step_move_always_valid hstep
                         ⟨ nextState, move.apply idx hvalid ⟩
 
-theorem stepConfig_gives_nextConfig (c1 c2 : Config σ n) : m.stepConfig x c1 = c2 ↔ m.nextConfig x c1 c2 where
+theorem stepConfig_gives_nextConfig (c1 c2 : Config σ n) : m.stepConfig w c1 = c2 ↔ m.nextConfig w c1 c2 where
   mp := by
     intro h 
-    rcases hstep : m.step (x.get c1.idx) c1.state with ⟨t, move⟩
+    rcases hstep : m.step (w.get c1.idx) c1.state with ⟨t, move⟩
     simp [hstep, stepConfig, Config.ext_iff] at h
     cases hmove : move
     · left
@@ -56,8 +56,8 @@ theorem stepConfig_gives_nextConfig (c1 c2 : Config σ n) : m.stepConfig x c1 = 
       · simp only
       · simp only [happly]
 
-theorem nextConfig_right_unique {m : TwoDFA α σ} {x : Word α n} {strt c1 c2 : Config σ n}
-  (h1 : m.nextConfig x strt c1) (h2 : m.nextConfig x strt c2) : c1 = c2 := by
+theorem nextConfig_right_unique {m : TwoDFA α σ} {w : Word α n} {strt c1 c2 : Config σ n}
+  (h1 : m.nextConfig w strt c1) (h2 : m.nextConfig w strt c2) : c1 = c2 := by
     rw [←stepConfig_gives_nextConfig] at h1 h2
     exact h1.symm.trans h2
 
