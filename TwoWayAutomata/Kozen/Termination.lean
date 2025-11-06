@@ -13,44 +13,50 @@ def next_except_halt (m : TwoDFA α σ) (x : Word α n) (c1 c2 : Config σ n) : 
 
 variable {m : TwoDFA α σ} {x : Word α n} 
 
-lemma ne_accept_of_next_ne_accept (c1 c2 : Config σ n) (hne : c2.state ≠ .accept) (hnext : m.nextConfig x c1 c2) : c1.state ≠ .accept := by
-  by_contra heq
-  absurd hne
-  apply m.accept_preserve_state x (c1.idx) _
-  rw [←heq]
-  exact GoesTo.single hnext
-
-lemma ne_reject_of_next_ne_reject (c1 c2 : Config σ n) (hne : c2.state ≠ .reject) (hnext : m.nextConfig x c1 c2) : c1.state ≠ .reject := by
-  by_contra heq
-  absurd hne
-  apply m.reject_preserve_state x (c1.idx) _
-  rw [←heq]
-  exact GoesTo.single hnext
+lemma eq_other_of_next_eq_other (c1 c2 : Config σ n) {p : σ}
+  (heq : c2.state = .other p) (hnext : m.nextConfig x c1 c2) :
+    ∃ q, c1.state = .other q := by
+  cases hq1 : c1.state
+  case other q => simp only [State.other.injEq, exists_eq']
+  case' accept =>
+    have hpreserve := m.accept_preserve_state x c1.idx c2
+  case' reject =>
+    have hpreserve := m.reject_preserve_state x c1.idx c2
+  all_goals
+    have := by
+      apply hpreserve
+      rw [←hq1]
+      exact GoesTo.single hnext
+    simp [this] at heq
 
 theorem TransGen_next_except_halt_of_GoesTo_except_halt_of_ne (c1 c2 : Config σ n)
-  (hna : c2.state ≠ .accept) (hnr : c2.state ≠ .reject) (hgoes : m.GoesTo x c1 c2) (hne : c1 ≠ c2) :
+  {q : σ} (hoth : c2.state = .other q) (hgoes : m.GoesTo x c1 c2) (hne : c1 ≠ c2) :
     Relation.TransGen (m.next_except_halt x) c1 c2 := by
-  induction hgoes with
+  induction hgoes generalizing q with
   | refl => contradiction
   | @tail mid _ _ tl ih =>
-    have hna' : mid.state ≠ .accept := ne_accept_of_next_ne_accept _ _ hna tl
-    have hnr' : mid.state ≠ .reject := ne_reject_of_next_ne_reject _ _ hnr tl
     by_cases heq' : c1 = mid
     · apply Relation.TransGen.single
       rw [heq']
-      exact ⟨hna, hnr, tl⟩
+      refine ⟨?_, ?_, tl⟩
+      <;> simp [hoth]
     · apply Relation.TransGen.tail
-      · exact ih hna' hnr' heq'
-      · exact ⟨hna, hnr, tl⟩
+      · obtain ⟨_, hoth'⟩ := eq_other_of_next_eq_other _ _ hoth tl
+        exact ih hoth' heq'
+      · refine ⟨?_, ?_, tl⟩
+        <;> simp [hoth]
 
+/---
+If the nextConfig relation only has halting cycles, then the 2DFA must not diverge on this input.
+--/
 theorem halts_of_next_except_halt_WF (hwf : WellFounded (m.next_except_halt x)) : ¬ m.diverges x := by
   by_contra hdiv
   obtain ⟨q, i, hreach, prev, path, link⟩ := hdiv
   absurd (WellFounded.transGen hwf).isIrrefl.irrefl ⟨q, i⟩
   apply Relation.TransGen.tail
-  · apply TransGen_next_except_halt_of_GoesTo_except_halt_of_ne (hgoes := path)
-    · exact ne_accept_of_next_ne_accept _ _ (by simp) link
-    · exact ne_reject_of_next_ne_reject _ _ (by simp) link
+  · obtain ⟨p, hoth⟩ := eq_other_of_next_eq_other _ _ rfl link
+    apply TransGen_next_except_halt_of_GoesTo_except_halt_of_ne (hgoes := path)
+    · exact hoth
     · by_contra heq
       rw [←heq] at link
       have := nextConfig.irrefl m x ⟨q, i⟩

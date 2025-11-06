@@ -16,17 +16,15 @@ inductive ExampleState : Type where
 
 def exampleStep (a : TapeSymbol (Fin 2)) (s : ExampleState) : State ExampleState × Movement :=
   match s, a with
-  | .q, .right => (.accept, .left)
+  | .q, .right    => (.accept, .left)
   | .q, .symbol 0 => (.other .q, .left)
-  | .q, _ => (.other .q, .right)
+  | .q, _         => (.other .q, .right)
 
 /-- A 2DFA that recognises strings consisting of entirely 1's, diverging on any string that contains a 0 -/
 def example2DFA : TwoDFA (Fin 2) ExampleState where
   start := .q
   stepOther := exampleStep
-  stay_in_bounds p := by
-    cases p
-    simp [exampleStep]
+  stay_in_bounds | .q => by simp [exampleStep]
 
 def exampleConfigMeaning {n : Nat} : TwoDFA.ConfigMeaning n (Fin 2) ExampleState where
   accept w := w.all (· == 1)

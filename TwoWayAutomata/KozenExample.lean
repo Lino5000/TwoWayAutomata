@@ -50,13 +50,13 @@ theorem fin3_lt_3 (j : Fin 3) : j = 0 ∨ j = 1 ∨ j = 2 := by
 def exampleStep (a : TapeSymbol <| Fin 2) (s : ExampleState) : State ExampleState × Movement :=
   match s, a with
   | .q i, .symbol 0 => (ExampleState.q (i+1), Movement.right)
-  | .q 0, .right => (ExampleState.p 0, Movement.left)
-  | .q _, .right => (.reject, Movement.left)
-  | .q i, _ => (ExampleState.q i, Movement.right)
+  | .q 0, .right    => (ExampleState.p 0, Movement.left)
+  | .q _, .right    => (.reject, Movement.left)
+  | .q i, _         => (ExampleState.q i, Movement.right)
   | .p j, .symbol 1 => (ExampleState.p (j+1), Movement.left)
-  | .p 0, .left => (.accept, Movement.right)
-  | .p 1, .left => (.reject, Movement.right)
-  | .p j, _ => (ExampleState.p j, Movement.left)
+  | .p 0, .left     => (.accept, Movement.right)
+  | .p 1, .left     => (.reject, Movement.right)
+  | .p j, _         => (ExampleState.p j, Movement.left)
 
 /-- A 2DFA which identifies strings of {0, 1} where the number of 0s is divisible by 3 and the number of 1s is divisible by 2 -/
 def example2DFA : TwoDFA (Fin 2) ExampleState where
@@ -99,23 +99,23 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
       have right_valid : Movement.right.isValid (n := n) 0 := by constructor <;> simp
       have right_apply : Movement.right.apply 0 right_valid = 1 := by rw [←Fin.val_inj]; simp [Movement.apply]
       simpa [example2DFA, exampleConfigMeaning, TwoDFA.stepConfig, exampleStep, hget', right_apply, Word.split_one]
-    | .p j, .left => cases fin2_lt_2 j; all_goals
-      rename j = _ => hj
-      unfold get_res at hget
-      have idx_zero : idx = 0 := Word.eq_zero_of_get_eq_left hget
-      rw [idx_zero]
-      rw [hj]
-      conv at hind =>
-        rw [idx_zero, hj]
-        simp only [TwoDFA.ConfigMeaning.apply, ↓reduceDIte, exampleConfigMeaning, Fin.val_zero, Fin.val_one]
-      have : w.get 0 = .left := by rw [←idx_zero]; exact hget
-      have right_valid : Movement.right.isValid (n := n) 0 := ⟨by simp, by simp⟩
-      have right_apply : Movement.right.apply 0 right_valid = 1 := by unfold Movement.apply; rw [←Fin.val_inj]; simp
-      simp [TwoDFA.ConfigMeaning.apply, TwoDFA.stepConfig, example2DFA, exampleStep, right_apply, exampleConfigMeaning, hind]
-    | .q j, .right =>
-      cases fin3_lt_3 j; case' inr => rename j = _ ∨ _ => hj'; cases hj'
+    | .p j, .left =>
+      rcases fin2_lt_2 j with hj | hj
       all_goals
-        rename j = _ => hj
+        unfold get_res at hget
+        have idx_zero : idx = 0 := Word.eq_zero_of_get_eq_left hget
+        rw [idx_zero]
+        rw [hj]
+        conv at hind =>
+          rw [idx_zero, hj]
+          simp only [TwoDFA.ConfigMeaning.apply, ↓reduceDIte, exampleConfigMeaning, Fin.val_zero, Fin.val_one]
+        have : w.get 0 = .left := by rw [←idx_zero]; exact hget
+        have right_valid : Movement.right.isValid (n := n) 0 := ⟨by simp, by simp⟩
+        have right_apply : Movement.right.apply 0 right_valid = 1 := by unfold Movement.apply; rw [←Fin.val_inj]; simp
+        simp [TwoDFA.ConfigMeaning.apply, TwoDFA.stepConfig, example2DFA, exampleStep, right_apply, exampleConfigMeaning, hind]
+    | .q j, .right =>
+      rcases fin3_lt_3 j with hj | hj | hj
+      all_goals
         unfold get_res at hget
         have idx_last := Word.eq_last_of_get_eq_right hget
         rw [idx_last]
@@ -197,14 +197,13 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           rw [split_n_tail_empty]
           simp [hind]
     | .q j, .symbol a =>
-      cases fin3_lt_3 j; case' inr => rename j = _ ∨ _ => hj'; cases hj'
+      rcases fin3_lt_3 j with hj | hj | hj
       all_goals
-        rename j = _ => hj
         unfold get_res at hget
         have idx_int : idx.internal := w.internal_of_get_eq_symbol <| by use a
         rw [hj]
-        cases fin2_lt_2 a; all_goals
-          rename a = _ => ha
+        rcases fin2_lt_2 a with ha | ha
+        all_goals
           conv in example2DFA.stepConfig _ _ =>
             simp only [TwoDFA.stepConfig, example2DFA, Fin.isValue, hget, ha, exampleStep, Fin.reduceAdd]
           conv at hind =>
@@ -227,13 +226,13 @@ theorem exampleCMInductive {n : Nat} : exampleConfigMeaning.Inductive (n := n) e
           rw [Nat.add_mod, hind, this]
           simp [ha]
     | .p j, .symbol a =>
-      cases fin2_lt_2 j; all_goals
-        rename j = _ => hj
+      rcases fin2_lt_2 j with hj | hj
+      all_goals
         unfold get_res at hget
         have idx_int : idx.internal := w.internal_of_get_eq_symbol <| by use a
         rw [hj]
-        cases fin2_lt_2 a; all_goals
-          rename a = _ => ha
+        rcases fin2_lt_2 a with ha | ha
+        all_goals
           conv in example2DFA.stepConfig _ _ =>
             simp only [TwoDFA.stepConfig, example2DFA, Fin.isValue, hget, ha, exampleStep, Fin.reduceAdd]
           conv at hind =>
