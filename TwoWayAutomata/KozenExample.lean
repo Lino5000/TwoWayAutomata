@@ -311,17 +311,15 @@ def cfg_encoding : TwoDFA.WellFoundedEncoding ExampleState where
   | ⟨.q _, pos⟩ => (0, pos)
   | ⟨.p _, pos⟩ => (1, pos.rev)
 
-lemma example_never_p_to_q {n : Nat} {w : Word (Fin 2) n} : ∀ i, ∀ j, ∀ p1 p2, ¬ example2DFA.nextConfig w ⟨.other (.p i), p1⟩ ⟨.other (.q j), p2⟩
-  | i, j, p1, p2 => by
-    simp only [example2DFA, Fin.isValue, ← TwoDFA.stepConfig_gives_nextConfig,
-      TwoDFA.stepConfig, TwoDFA.Config.mk.injEq, not_and]
-    rcases fin2_lt_2 i with h | h
-    all_goals
-      intro hstep
-      absurd hstep; clear hstep
-      cases w.get p1 with
-      | left | right => simp [h, exampleStep]
-      | symbol a => rcases fin2_lt_2 a with ha | ha <;> simp [ha, exampleStep]
+lemma example_never_p_to_q {n : Nat} {w : Word (Fin 2) n} (i : _) (j : _) (p1 p2 : _) : ¬ example2DFA.nextConfig w ⟨.other (.p i), p1⟩ ⟨.other (.q j), p2⟩ := by
+  simp only [example2DFA, Fin.isValue, ← TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, TwoDFA.Config.mk.injEq, not_and]
+  rcases fin2_lt_2 i with h | h
+  all_goals
+    intro hstep
+    absurd hstep; clear hstep
+    cases w.get p1 with
+    | left | right => simp [h, exampleStep]
+    | symbol a => rcases fin2_lt_2 a with ha | ha <;> simp [ha, exampleStep]
 
 lemma example_q_to_q_right {j1 j2 : Fin 3} {a : TapeSymbol (Fin 2)} (h : (exampleStep a (.q j1)).1 = .other (.q j2)) : (exampleStep a (.q j1)).2 = .right := by
   rcases a with left | right | a
