@@ -38,10 +38,9 @@ def machine : TwoDFA α (ExState k) where
   start := .pass
   stepOther
     | .right, .pass => (.other <| .count <| Fin.last _, .left)
-    | _, .pass => (.other .pass, .right)
+    | _,      .pass => (.other .pass, .right)
     -- If we run out of space while counting back, reject
     | .left, .count j => (.reject, .right)
-    -- Makes some proofs easier to have this be explicit,
     -- This case is impossible to reach so we choose the returned state to make other proofs easier
     | .right, .count j => (.other <| .count j, .left)
     | .symbol sym, .count j => 
@@ -213,7 +212,7 @@ theorem machine_halts {w : List α} : ¬(machine k a).diverges w.toWord := by
         apply Prod.Lex.left
         rw [GT.gt, Fin.lt_iff_val_lt_val]
         simp [Fin.sub_one_lt_iff, Fin.pos_of_ne_zero hj1]
-  | .count j, .pass =>
+  | .count j, .pass => -- This case is impossible, by definition of the transitions
     cases hget : w.toWord.get i1
     case left =>
       simp [←TwoDFA.stepConfig_gives_nextConfig, TwoDFA.stepConfig, machine, hget] at hnext
